@@ -349,8 +349,9 @@ public client class Repository {
     # + requiredSkills - Skills
     # + organizationId - Org ID
     # + recruiterId - Recruiter ID
+    # + evaluationTemplateId - Optional evaluation template ID
     # + return - Job ID or Error
-    remote function createJob(string title, string description, string[] requiredSkills, string organizationId, string recruiterId) returns string|error {
+    remote function createJob(string title, string description, string[] requiredSkills, string organizationId, string recruiterId, string? evaluationTemplateId = ()) returns string|error {
         json payload = {
             "title": title,
             "description": description,
@@ -358,6 +359,13 @@ public client class Repository {
             "organization_id": organizationId,
             "recruiter_id": recruiterId
         };
+
+        // Add evaluation_template_id if provided
+        if evaluationTemplateId is string && evaluationTemplateId != "" {
+            map<json> payloadMap = <map<json>>payload;
+            payloadMap["evaluation_template_id"] = evaluationTemplateId;
+            payload = payloadMap;
+        }
 
         http:Response response = check self.httpClient->post("/rest/v1/jobs", payload, headers = self.headers);
 

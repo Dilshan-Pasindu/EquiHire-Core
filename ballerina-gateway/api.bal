@@ -118,13 +118,14 @@ service /api on apiListener {
 
         string realRecruiterId = <string>recruiterIdResult;
 
-        // Correct call: title, description, requiredSkills (string[]), organizationId, recruiterId
+        // Correct call: title, description, requiredSkills (string[]), organizationId, recruiterId, evaluationTemplateId
         string|error jobId = dbClient->createJob(
             payload.title,
             payload.description,
             payload.requiredSkills,
             payload.organizationId,
-            realRecruiterId
+            realRecruiterId,
+            payload.evaluationTemplateId
         );
 
         if jobId is error {

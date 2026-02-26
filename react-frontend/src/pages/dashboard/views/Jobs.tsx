@@ -1,22 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useAuthContext } from "@asgardeo/auth-react";
 import { API } from "@/lib/api";
-import CreateJob from '../CreateJob';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Briefcase, Edit2, Trash2, Loader2, Plus, X, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Briefcase, Edit2, Trash2, Loader2, Plus, X, Check, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ConfirmDeleteDialog, ConfirmUpdateDialog } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
+// ── Skill Categories ──
 const SKILL_CATEGORIES: Record<string, string[]> = {
-    "Languages": ["Python", "Java", "C++", "C#", "JavaScript", "TypeScript", "Swift", "Kotlin"],
-    "Web & Frameworks": ["React", "Angular", "Vue.js", "Node.js", "Spring Boot", "Django", "Flask", "FastAPI", "GraphQL", "REST API"],
-    "Data & AI": ["Machine Learning", "Deep Learning", "NLP", "TensorFlow", "PyTorch", "Pandas", "NumPy"],
-    "Infrastructure": ["AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "CI/CD", "Linux"],
-    "Databases": ["SQL", "NoSQL", "MongoDB", "PostgreSQL", "MySQL", "Oracle"],
+    "Languages": [
+        "Python", "Java", "C++", "C#", "JavaScript", "TypeScript", "Swift", "Kotlin", "Bash"
+    ],
+    "Web & Frameworks": [
+        "React", "Angular", "Vue.js", "Node.js", "Spring Boot", "Django", "Flask", "FastAPI",
+        "React Native", "Flutter", "GraphQL", "REST API", "Microservices"
+    ],
+    "Data & AI": [
+        "Machine Learning", "Deep Learning", "NLP", "TensorFlow", "PyTorch", "Pandas",
+        "NumPy", "Scikit-learn", "Hadoop", "Spark", "Kafka", "PowerBI", "Tableau"
+    ],
+    "Infrastructure & Cloud": [
+        "AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "Jenkins",
+        "Git", "CI/CD", "Linux", "Redis"
+    ],
+    "Databases": [
+        "SQL", "NoSQL", "MongoDB", "PostgreSQL", "MySQL", "Oracle"
+    ],
+    "Tools & Agile": [
+        "Figma", "Adobe XD", "JIRA", "Agile", "Scrum"
+    ]
+};
+
+type EvaluationTemplate = {
+    id: string;
+    name: string;
+    description: string;
+    type: string;
+    prompt_template: string;
+    is_system_template: boolean;
 };
 
 export default function JobsManager() {
@@ -25,20 +51,36 @@ export default function JobsManager() {
     const [organization, setOrganization] = useState<{ id: string; name: string } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Edit Dialog
+    // ── Create Job State ──
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [skills, setSkills] = useState<string[]>([]);
+    const [currentSkill, setCurrentSkill] = useState('');
+    const [activeCategory, setActiveCategory] = useState<string>("Languages");
+    const [isCreating, setIsCreating] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+
+    // ── Evaluation Template State ──
+    const [evaluationTemplates, setEvaluationTemplates] = useState<EvaluationTemplate[]>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+    const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+
+    // ── Edit Dialog ──
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [editingJob, setEditingJob] = useState<any>(null);
     const [editForm, setEditForm] = useState({ title: '', description: '', requiredSkills: [] as string[] });
-    const [activeCategory, setActiveCategory] = useState("Languages");
-    const [customSkill, setCustomSkill] = useState('');
+    const [editActiveCategory, setEditActiveCategory] = useState("Languages");
+    const [editCustomSkill, setEditCustomSkill] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
-    // Confirm Dialogs
+    // ── Confirm Dialogs ──
     const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // ── Data Fetching ──
     const fetchJobs = () => {
         if (state.sub) {
             setIsLoading(true);
@@ -49,12 +91,27 @@ export default function JobsManager() {
         }
     };
 
+    const fetchTemplates = async (orgId: string) => {
+        setIsLoadingTemplates(true);
+        try {
+            const data = await API.getEvaluationTemplates(orgId);
+            setEvaluationTemplates(data);
+        } catch (err) {
+            console.error("Failed to fetch evaluation templates", err);
+        } finally {
+            setIsLoadingTemplates(false);
+        }
+    };
+
     useEffect(() => {
         const fetchOrg = async () => {
             if (state.sub) {
                 try {
                     const data = await API.getOrganization(state.sub);
-                    if (data) setOrganization(data);
+                    if (data) {
+                        setOrganization(data);
+                        fetchTemplates(data.id);
+                    }
                 } catch (error) {
                     console.error("Failed to fetch organization", error);
                 }
@@ -64,6 +121,69 @@ export default function JobsManager() {
         fetchJobs();
     }, [state.sub]);
 
+    // ── Create Job Handlers ──
+    const toggleSkill = (skill: string) => {
+        setSkills(prev =>
+            prev.includes(skill)
+                ? prev.filter(s => s !== skill)
+                : [...prev, skill]
+        );
+    };
+
+    const handleAddCustomSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && currentSkill.trim()) {
+            e.preventDefault();
+            toggleSkill(currentSkill.trim());
+            setCurrentSkill('');
+        }
+    };
+
+    const handleCreateJob = async () => {
+        setError('');
+        setSuccess('');
+
+        if (!title || !description || skills.length === 0) {
+            setError('Please fill in required fields and add at least one skill.');
+            return;
+        }
+
+        if (!selectedTemplateId) {
+            setError('Please select an evaluation criteria template.');
+            return;
+        }
+
+        if (!organization?.id || !state.sub) {
+            setError('Organization or recruiter information missing.');
+            return;
+        }
+
+        setIsCreating(true);
+        try {
+            const jobPayload = {
+                title,
+                description,
+                requiredSkills: skills,
+                organizationId: organization.id,
+                recruiterId: state.sub,
+                evaluationTemplateId: selectedTemplateId,
+            };
+
+            await API.createJob(jobPayload);
+            setSuccess('Job role created successfully! You can now add interview questions in the Questions tab.');
+            setTitle('');
+            setDescription('');
+            setSkills([]);
+            setSelectedTemplateId('');
+            fetchJobs();
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || 'Failed to create job.');
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    // ── Edit Job Handlers ──
     const openEditDialog = (job: any) => {
         setEditingJob(job);
         setEditForm({
@@ -74,7 +194,7 @@ export default function JobsManager() {
         setEditDialogOpen(true);
     };
 
-    const toggleSkill = (skill: string) => {
+    const toggleEditSkill = (skill: string) => {
         setEditForm(prev => ({
             ...prev,
             requiredSkills: prev.requiredSkills.includes(skill)
@@ -83,11 +203,11 @@ export default function JobsManager() {
         }));
     };
 
-    const handleAddCustomSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && customSkill.trim()) {
+    const handleEditAddCustomSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && editCustomSkill.trim()) {
             e.preventDefault();
-            toggleSkill(customSkill.trim());
-            setCustomSkill('');
+            toggleEditSkill(editCustomSkill.trim());
+            setEditCustomSkill('');
         }
     };
 
@@ -124,6 +244,9 @@ export default function JobsManager() {
         }
     };
 
+    // ── Helper: Get selected template details ──
+    const selectedTemplate = evaluationTemplates.find(t => t.id === selectedTemplateId);
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <div>
@@ -132,12 +255,178 @@ export default function JobsManager() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Create Job Form */}
+                {/* ═══ Create Job Form ═══ */}
                 <div className="col-span-1 lg:col-span-2">
-                    <CreateJob organizationId={organization?.id} onJobCreated={fetchJobs} />
+                    <Card className="shadow-lg mb-8 border-t-4 border-t-[#FF7300]">
+                        <CardHeader>
+                            <div className="flex items-center">
+                                <Briefcase className="h-6 w-6 mr-2 text-[#FF7300]" />
+                                <CardTitle>Create New Job Role</CardTitle>
+                            </div>
+                            <CardDescription>Define the role, required skills, and evaluation criteria to start filtering candidates.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {error && <p className="text-red-500 text-sm bg-red-50 p-2 rounded">{error}</p>}
+                            {success && <p className="text-green-600 text-sm bg-green-50 p-2 rounded">{success}</p>}
+
+                            {/* Title & Description */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="title">Job Title</Label>
+                                    <Input
+                                        id="title"
+                                        placeholder="e.g. Senior Frontend Engineer"
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        className="bg-white"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="description">Short Description</Label>
+                                    <Input
+                                        id="description"
+                                        placeholder="Brief description of the role..."
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        className="bg-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* ── Skills Selector ── */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <Label>Required Skills</Label>
+                                    <span className="text-xs text-gray-500">{skills.length} selected</span>
+                                </div>
+
+                                {skills.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100 min-h-[50px]">
+                                        {skills.map(skill => (
+                                            <span key={skill} className="bg-[#FF7300]/10 text-[#FF7300] border border-[#FF7300]/20 text-xs px-2 py-1 rounded-full flex items-center shadow-sm animate-in fade-in zoom-in duration-200">
+                                                {skill}
+                                                <button onClick={() => toggleSkill(skill)} className="ml-1 text-[#FF7300] hover:text-[#d36000]">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                                    <div className="flex overflow-x-auto border-b bg-gray-50 scrollbar-hide">
+                                        {Object.keys(SKILL_CATEGORIES).map((category) => (
+                                            <button
+                                                key={category}
+                                                onClick={() => setActiveCategory(category)}
+                                                className={cn(
+                                                    "px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 hover:bg-gray-100",
+                                                    activeCategory === category
+                                                        ? "border-[#FF7300] text-[#FF7300] bg-white"
+                                                        : "border-transparent text-gray-600"
+                                                )}
+                                            >
+                                                {category}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="p-4 bg-white min-h-[200px]">
+                                        <div className="flex flex-wrap gap-2">
+                                            {(SKILL_CATEGORIES[activeCategory] || []).map((skill) => {
+                                                const isSelected = skills.includes(skill);
+                                                return (
+                                                    <button
+                                                        key={skill}
+                                                        onClick={() => toggleSkill(skill)}
+                                                        className={cn(
+                                                            "text-xs px-3 py-1.5 rounded-full border transition-all duration-200 flex items-center",
+                                                            isSelected
+                                                                ? "bg-[#FF7300] text-white border-[#FF7300] shadow-md transform scale-105"
+                                                                : "bg-white text-gray-700 border-gray-200 hover:border-[#FF7300] hover:text-[#FF7300] hover:shadow-sm"
+                                                        )}
+                                                    >
+                                                        {isSelected && <Check className="w-3 h-3 mr-1" />}
+                                                        {skill}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 bg-gray-50 border-t flex items-center gap-2">
+                                        <Plus className="w-4 h-4 text-gray-400" />
+                                        <Input
+                                            placeholder="Add a custom skill..."
+                                            value={currentSkill}
+                                            onChange={(e) => setCurrentSkill(e.target.value)}
+                                            onKeyDown={handleAddCustomSkill}
+                                            className="border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 h-8 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Evaluation Criteria Selector ── */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <Label className="flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-[#FF7300]" />
+                                        Evaluation Criteria
+                                    </Label>
+                                    {isLoadingTemplates && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+                                </div>
+
+                                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                                    <SelectTrigger className="bg-white">
+                                        <SelectValue placeholder="Select an evaluation template..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {evaluationTemplates.length === 0 ? (
+                                            <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                                                No templates available. Create one in the Marking Criteria tab.
+                                            </div>
+                                        ) : (
+                                            evaluationTemplates.map((template) => (
+                                                <SelectItem key={template.id} value={template.id}>
+                                                    <div className="flex items-center gap-2">
+                                                        {template.is_system_template && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
+                                                                System
+                                                            </span>
+                                                        )}
+                                                        {template.name}
+                                                    </div>
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Preview selected template */}
+                                {selectedTemplate && (
+                                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 animate-in fade-in duration-200">
+                                        <p className="text-xs font-medium text-gray-700 mb-1">{selectedTemplate.name}</p>
+                                        <p className="text-xs text-gray-500">{selectedTemplate.description}</p>
+                                        <p className="text-[11px] text-gray-400 mt-2 font-mono line-clamp-2">{selectedTemplate.prompt_template}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── Create Button ── */}
+                            <Button
+                                onClick={handleCreateJob}
+                                disabled={isCreating}
+                                className="w-full bg-gray-900 hover:bg-gray-800 h-11 text-base shadow-md transition-all active:scale-[0.99]"
+                            >
+                                {isCreating ? 'Creating Job...' : 'Create Job Role'} <Plus className="ml-2 h-4 w-4" />
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </div>
 
-                {/* Active Roles Sidebar (Right) */}
+                {/* ═══ Active Roles Sidebar ═══ */}
                 <div className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -162,7 +451,6 @@ export default function JobsManager() {
                                                     <p className="text-xs text-gray-500">{new Date(job.created_at).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
-                                            {/* Edit/Delete on hover */}
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
                                                 <button
                                                     onClick={() => openEditDialog(job)}
@@ -186,7 +474,7 @@ export default function JobsManager() {
                 </div>
             </div>
 
-            {/* Edit Job Dialog */}
+            {/* ═══ Edit Job Dialog ═══ */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
@@ -225,7 +513,7 @@ export default function JobsManager() {
                                     {editForm.requiredSkills.map(skill => (
                                         <span key={skill} className="bg-[#FF7300]/10 text-[#FF7300] border border-[#FF7300]/20 text-xs px-2 py-1 rounded-full flex items-center">
                                             {skill}
-                                            <button onClick={() => toggleSkill(skill)} className="ml-1 hover:text-[#d36000]">
+                                            <button onClick={() => toggleEditSkill(skill)} className="ml-1 hover:text-[#d36000]">
                                                 <X className="w-3 h-3" />
                                             </button>
                                         </span>
@@ -238,10 +526,10 @@ export default function JobsManager() {
                                     {Object.keys(SKILL_CATEGORIES).map((category) => (
                                         <button
                                             key={category}
-                                            onClick={() => setActiveCategory(category)}
+                                            onClick={() => setEditActiveCategory(category)}
                                             className={cn(
                                                 "px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2",
-                                                activeCategory === category
+                                                editActiveCategory === category
                                                     ? "border-[#FF7300] text-[#FF7300] bg-white"
                                                     : "border-transparent text-gray-600 hover:text-gray-900"
                                             )}
@@ -252,12 +540,12 @@ export default function JobsManager() {
                                 </div>
                                 <div className="p-3 bg-white min-h-[120px]">
                                     <div className="flex flex-wrap gap-1.5">
-                                        {(SKILL_CATEGORIES[activeCategory] || []).map((skill) => {
+                                        {(SKILL_CATEGORIES[editActiveCategory] || []).map((skill) => {
                                             const isSelected = editForm.requiredSkills.includes(skill);
                                             return (
                                                 <button
                                                     key={skill}
-                                                    onClick={() => toggleSkill(skill)}
+                                                    onClick={() => toggleEditSkill(skill)}
                                                     className={cn(
                                                         "text-xs px-2.5 py-1 rounded-full border transition-all duration-200 flex items-center",
                                                         isSelected
@@ -276,9 +564,9 @@ export default function JobsManager() {
                                     <Plus className="w-3 h-3 text-gray-400" />
                                     <Input
                                         placeholder="Add custom skill..."
-                                        value={customSkill}
-                                        onChange={(e) => setCustomSkill(e.target.value)}
-                                        onKeyDown={handleAddCustomSkill}
+                                        value={editCustomSkill}
+                                        onChange={(e) => setEditCustomSkill(e.target.value)}
+                                        onKeyDown={handleEditAddCustomSkill}
                                         className="border-0 bg-transparent focus-visible:ring-0 h-7 text-xs"
                                     />
                                 </div>
@@ -298,7 +586,7 @@ export default function JobsManager() {
                 </DialogContent>
             </Dialog>
 
-            {/* Confirmation Dialogs */}
+            {/* ═══ Confirmation Dialogs ═══ */}
             <ConfirmUpdateDialog
                 open={confirmUpdateOpen}
                 onOpenChange={setConfirmUpdateOpen}

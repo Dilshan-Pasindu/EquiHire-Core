@@ -4,7 +4,7 @@ import { EquiHireLogo } from "@/components/ui/Icons";
 import { Textarea } from "@/components/ui/textarea";
 import { API } from "@/lib/api";
 import {
-    Loader2, AlertCircle, ShieldAlert, Eye, AlertTriangle,
+    Loader2, AlertCircle, ShieldAlert, Eye, 
     Copy, ClipboardPaste, MousePointer, MonitorX, Terminal
 } from "lucide-react";
 

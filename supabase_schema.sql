@@ -94,7 +94,6 @@ CREATE TABLE public.jobs (
     organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE,
     recruiter_id UUID REFERENCES public.recruiters(id) ON DELETE SET NULL,
     evaluation_template_id UUID REFERENCES public.evaluation_templates(id) ON DELETE SET NULL,
-    -- Filter Logic
     required_skills JSONB, -- ["Python", "Django", "RestAPI"]
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

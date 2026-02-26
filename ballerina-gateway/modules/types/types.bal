@@ -142,12 +142,14 @@ public type RevealResponse record {
 # + requiredSkills - List of required skills
 # + organizationId - Organization ID
 # + recruiterId - Recruiter ID
+# + evaluationTemplateId - Optional evaluation template ID
 public type JobRequest record {
     string title;
     string description;
     string[] requiredSkills;
     string organizationId;
     string recruiterId;
+    string? evaluationTemplateId = ();
 };
 
 # Response for Job creation.
