@@ -1,141 +1,93 @@
-import { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Code, FileText, AlertCircle, Terminal, Briefcase, Loader2 } from "lucide-react";
-import { useAuthContext } from "@asgardeo/auth-react";
-import { API } from "@/lib/api";
+/**
+ * Questions view: select job, list questions, add/delete questions. Uses useQuestions for data and actions.
+ */
+
+import { useState } from 'react';
+import { useAuthContext } from '@asgardeo/auth-react';
+import { useQuestions } from '@/hooks';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Trash2, Code, FileText, AlertCircle, Terminal, Briefcase, Loader2 } from 'lucide-react';
 
 export default function Questions() {
-    const { state } = useAuthContext();
-    const [jobs, setJobs] = useState<any[]>([]);
-    const [selectedJobId, setSelectedJobId] = useState<string>("");
-    const [questions, setQuestions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+  const { state } = useAuthContext();
+  const userId = state.sub;
+  const {
+    jobs,
+    selectedJobId,
+    setSelectedJobId,
+    questions,
+    questionCounts,
+    isLoading: loading,
+    addQuestion,
+    deleteQuestion,
+  } = useQuestions({ userId });
 
-    // New Question State
-    const [questionText, setQuestionText] = useState("");
-    const [sampleAnswer, setSampleAnswer] = useState("");
-    const [keywordsInput, setKeywordsInput] = useState("");
-    const [questionType, setQuestionType] = useState("paragraph");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState("");
-    const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
+  const [questionText, setQuestionText] = useState('');
+  const [sampleAnswer, setSampleAnswer] = useState('');
+  const [keywordsInput, setKeywordsInput] = useState('');
+  const [questionType, setQuestionType] = useState('paragraph');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
+  const selectedJob = jobs.find((j) => j.id === selectedJobId);
 
-    useEffect(() => {
-        if (state.sub) {
-            API.getJobs(state.sub)
-                .then((data) => {
-                    setJobs(data);
-                    // Fetch question counts for each job
-                    data.forEach((job: any) => {
-                        API.getJobQuestions(job.id)
-                            .then((qs: any[]) => setQuestionCounts(prev => ({ ...prev, [job.id]: qs.length })))
-                            .catch(() => setQuestionCounts(prev => ({ ...prev, [job.id]: 0 })));
-                    });
-                })
-                .catch(err => console.error("Failed to load jobs", err));
-        }
-    }, [state.sub]);
+  const handleAddQuestion = async () => {
+    setError('');
+    if (!selectedJobId) {
+      setError('Please select a job role first.');
+      return;
+    }
+    if (!selectedJob) {
+      setError('Job details not found.');
+      return;
+    }
+    if (questions.length >= 10) {
+      setError('Maximum 10 questions allowed per job.');
+      return;
+    }
+    if (!questionText.trim()) {
+      setError('Question description is required.');
+      return;
+    }
+    setIsSubmitting(true);
+    const keywords = keywordsInput
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+    const result = await addQuestion({
+      jobId: selectedJobId,
+      organizationId: selectedJob.organization_id,
+      questionText,
+      sampleAnswer,
+      keywords,
+      questionType,
+      sortOrder: questions.length + 1,
+    });
+    setIsSubmitting(false);
+    if (result.success) {
+      setQuestionText('');
+      setSampleAnswer('');
+      setKeywordsInput('');
+      setQuestionType('paragraph');
+    } else {
+      setError(result.error ?? 'Failed to add question.');
+    }
+  };
 
-    useEffect(() => {
-        if (selectedJobId) {
-            fetchQuestions(selectedJobId);
-        } else {
-            setQuestions([]);
-        }
-    }, [selectedJobId]);
-
-    const fetchQuestions = async (jobId: string) => {
-        setLoading(true);
-        try {
-            const data = await API.getJobQuestions(jobId);
-            setQuestions(data);
-            setQuestionCounts(prev => ({ ...prev, [jobId]: data.length }));
-        } catch (err) {
-            console.error("Failed to load questions", err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleAddQuestion = async () => {
-        setError("");
-
-        if (!selectedJobId) {
-            setError("Please select a job role first.");
-            return;
-        }
-
-        // 1. Find the selected job object to get its organization_id
-        const selectedJob = jobs.find(j => j.id === selectedJobId);
-
-        if (!selectedJob) {
-            setError("Job details not found.");
-            return;
-        }
-
-        if (questions.length >= 10) {
-            setError("Maximum 10 questions allowed per job.");
-            return;
-        }
-
-        if (!questionText.trim()) {
-            setError("Question description is required.");
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        const keywords = keywordsInput.split(",").map(k => k.trim()).filter(k => k);
-
-        // 2. Build the payload including organization_id
-        const newQuestion = {
-            jobId: selectedJobId,
-            organizationId: selectedJob.organization_id, // Added this line
-            questionText,
-            sampleAnswer,
-            keywords,
-            questionType,
-            sortOrder: questions.length + 1 // Keeps the order 1-10
-        };
-
-        try {
-            // API wrapper expects an array
-            await API.createJobQuestions([newQuestion]);
-
-            // Refresh list
-            await fetchQuestions(selectedJobId);
-
-            // Reset form
-            setQuestionText("");
-            setSampleAnswer("");
-            setKeywordsInput("");
-            setQuestionType("paragraph");
-        } catch (err: any) {
-            console.error(err);
-            // If the database trigger blocks the 11th question, it will show here
-            setError(err.message || "Failed to add question.");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleDeleteQuestion = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this question?")) return;
-
-        try {
-            await API.deleteQuestion(id);
-            setQuestions(questions.filter(q => q.id !== id));
-        } catch (err) {
-            console.error(err);
-            setError("Failed to delete question.");
-        }
-    };
+  const handleDeleteQuestion = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this question?')) return;
+    try {
+      await deleteQuestion(id);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete question.');
+    }
+  };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -160,7 +112,7 @@ export default function Questions() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {jobs.map((job) => (
-                                        <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
+                                        <SelectItem key={job.id || 'default'} value={job.id || ''}>{job.title}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -194,16 +146,16 @@ export default function Questions() {
                                                     <div className="flex justify-between items-start gap-4">
                                                         <div className="flex-1 space-y-2">
                                                             <div className="flex items-center gap-2 mb-1">
-                                                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors uppercase ${q.questionType === 'code'
+                                                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors uppercase ${q.type === 'code'
                                                                     ? 'bg-gray-900 text-white border-gray-700'
                                                                     : 'bg-white text-gray-600 border-gray-200'
                                                                     }`}>
-                                                                    {q.questionType === 'code' ? <Terminal className="w-3 h-3 mr-1" /> : <FileText className="w-3 h-3 mr-1" />}
-                                                                    {q.questionType}
+                                                                    {q.type === 'code' ? <Terminal className="w-3 h-3 mr-1" /> : <FileText className="w-3 h-3 mr-1" />}
+                                                                    {q.type}
                                                                 </span>
                                                             </div>
 
-                                                            {q.questionType === 'code' ? (
+                                                            {q.type === 'code' ? (
                                                                 <div className="bg-gray-900 rounded-md p-3 font-mono text-sm text-gray-300 border border-gray-700 shadow-inner">
                                                                     <div className="flex items-center gap-1.5 border-b border-gray-700 pb-2 mb-2 text-xs text-gray-500">
                                                                         <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
@@ -377,12 +329,12 @@ export default function Questions() {
                                     <p className="text-sm text-gray-400">No jobs available.</p>
                                 ) : (
                                     jobs.map((job) => {
-                                        const count = questionCounts[job.id];
+                                        const count = job.id ? questionCounts[job.id] : 0;
                                         const isSelected = selectedJobId === job.id;
                                         return (
                                             <div
-                                                key={job.id}
-                                                onClick={() => setSelectedJobId(job.id)}
+                                                key={job.id || 'default'}
+                                                onClick={() => { if (job.id) setSelectedJobId(job.id); }}
                                                 className={`p-3 border rounded-lg flex items-center justify-between cursor-pointer transition-all ${isSelected
                                                         ? 'bg-orange-50 border-[#FF7300]/30'
                                                         : 'bg-gray-50 hover:border-gray-300'

@@ -1,7 +1,10 @@
+/**
+ * Invite handler: validates magic-link token from URL, stores candidate data in sessionStorage, redirects to welcome.
+ */
 import { useEffect, useState } from 'react';
-import { EquiHireLogo } from "@/components/ui/Icons";
-import { Loader2, XCircle, CheckCircle } from "lucide-react";
-import { API } from "@/lib/api";
+import { EquiHireLogo } from '@/components/ui/Icons';
+import { Loader2, XCircle, CheckCircle } from 'lucide-react';
+import { API } from '@/lib/api';
 
 export default function InviteHandler() {
     const [status, setStatus] = useState<'validating' | 'success' | 'error'>('validating');

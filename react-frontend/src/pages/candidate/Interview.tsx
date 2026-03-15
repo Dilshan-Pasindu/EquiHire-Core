@@ -1,5 +1,8 @@
+/**
+ * Candidate interview: timed questions, answer submission, lockdown (copy/paste/tab) detection and violation reporting.
+ */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import { EquiHireLogo } from "@/components/ui/Icons";
 import { Textarea } from "@/components/ui/textarea";
 import { API } from "@/lib/api";
@@ -14,9 +17,15 @@ export default function CandidateInterview() {
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [isSubmitted, setIsSubmitted] = useState(false);
 
+    interface Question {
+        id: string;
+        questionText: string;
+        type?: 'text' | 'code';
+    }
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [questions, setQuestions] = useState<any[]>([]);
+    const [questions, setQuestions] = useState<Question[]>([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
     // --- Lockdown Browser State ---
@@ -30,7 +39,9 @@ export default function CandidateInterview() {
     const [warningMessage, setWarningMessage] = useState("");
     const [warningIcon, setWarningIcon] = useState<"copy" | "paste" | "rightclick" | "tabswitch">("tabswitch");
     const violationsRef = useRef(violations);
-    violationsRef.current = violations;
+    useEffect(() => {
+        violationsRef.current = violations;
+    }, [violations]);
 
     const totalViolations = violations.tabSwitches + violations.copyAttempts + violations.pasteAttempts + violations.rightClickAttempts;
 
@@ -115,67 +126,7 @@ export default function CandidateInterview() {
         };
     }, [loading, error, isSubmitted, flashWarning]);
 
-    // Initialize
-    useEffect(() => {
-        const initializeInterview = async () => {
-            try {
-                const storedDataStr = sessionStorage.getItem('candidateData');
-                if (!storedDataStr) {
-                    setError("No invitation session found. Please use the link provided in your email.");
-                    setLoading(false);
-                    return;
-                }
-                const storedData = JSON.parse(storedDataStr);
-                if (!storedData.jobId) {
-                    setError("Invalid session data. Job ID is missing.");
-                    setLoading(false);
-                    return;
-                }
-                const jobQuestions = await API.getJobQuestions(storedData.jobId);
-                setQuestions(jobQuestions);
-                setLoading(false);
-            } catch (err: any) {
-                console.error("Initialization error:", err);
-                setError("Failed to initialize interview. Please try again.");
-                setLoading(false);
-            }
-        };
-        initializeInterview();
-    }, []);
-
-    // Timer
-    useEffect(() => {
-        if (loading || error || isSubmitted) return;
-        const timer = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) { clearInterval(timer); handleSubmit(); return 0; }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [loading, error, isSubmitted]);
-
-    const formatTime = (seconds: number) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-    };
-
-    const handleAnswerChange = (val: string) => {
-        if (questions.length === 0) return;
-        const currentQId = questions[currentQuestionIndex].id;
-        setAnswers(prev => ({ ...prev, [currentQId]: val }));
-    };
-
-    const handleNext = () => {
-        if (currentQuestionIndex < questions.length - 1) setCurrentQuestionIndex(prev => prev + 1);
-    };
-
-    const handlePrev = () => {
-        if (currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1);
-    };
-
-    const handleSubmit = async () => {
+    const handleSubmit = useCallback(async () => {
         setIsSubmitted(true);
         const formattedAnswers = Object.entries(answers).map(([questionId, text]) => ({
             questionId,
@@ -222,7 +173,68 @@ export default function CandidateInterview() {
             alert("Failed to submit assessment.");
             setIsSubmitted(false);
         }
+    }, [answers]);
+
+    // Initialize
+    useEffect(() => {
+        const initializeInterview = async () => {
+            try {
+                const storedDataStr = sessionStorage.getItem('candidateData');
+                if (!storedDataStr) {
+                    setError("No invitation session found. Please use the link provided in your email.");
+                    setLoading(false);
+                    return;
+                }
+                const storedData = JSON.parse(storedDataStr);
+                if (!storedData.jobId) {
+                    setError("Invalid session data. Job ID is missing.");
+                    setLoading(false);
+                    return;
+                }
+                const jobQuestions = await API.getJobQuestions(storedData.jobId);
+                setQuestions(jobQuestions);
+                setLoading(false);
+            } catch (err: unknown) {
+                console.error("Initialization error:", err);
+                setError("Failed to initialize interview. Please try again.");
+                setLoading(false);
+            }
+        };
+        initializeInterview();
+    }, []);
+
+    // Timer
+    useEffect(() => {
+        if (loading || error || isSubmitted) return;
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) { clearInterval(timer); handleSubmit(); return 0; }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [loading, error, isSubmitted, handleSubmit]);
+
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
     };
+
+    const handleAnswerChange = (val: string) => {
+        if (questions.length === 0) return;
+        const currentQId = questions[currentQuestionIndex].id;
+        setAnswers(prev => ({ ...prev, [currentQId]: val }));
+    };
+
+    const handleNext = () => {
+        if (currentQuestionIndex < questions.length - 1) setCurrentQuestionIndex(prev => prev + 1);
+    };
+
+    const handlePrev = () => {
+        if (currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1);
+    };
+
 
     // --- Warning Icon Selector ---
     const getWarningIcon = () => {

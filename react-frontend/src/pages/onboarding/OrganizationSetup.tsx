@@ -1,18 +1,21 @@
-import { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Rocket, Code2, Cpu, Globe } from "lucide-react";
-import { EquiHireLogo } from "@/components/ui/Icons";
+/**
+ * Organization setup (onboarding): create organization for the authenticated user.
+ * Shown when user has no org; on success calls onComplete (e.g. refresh in App).
+ */
+import React, { useState } from 'react';
+import { useAuthContext } from '@asgardeo/auth-react';
+import { API } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Rocket, Code2, Cpu, Globe } from 'lucide-react';
+import { EquiHireLogo } from '@/components/ui/Icons';
 
-interface OrganizationSetupProps {
-    onComplete: () => void;
+export interface OrganizationSetupProps {
+  onComplete: () => void;
 }
-
-import { useAuthContext } from "@asgardeo/auth-react";
-import { API } from "@/lib/api";
 
 export default function OrganizationSetup({ onComplete }: OrganizationSetupProps) {
     const { state } = useAuthContext();
@@ -41,9 +44,10 @@ export default function OrganizationSetup({ onComplete }: OrganizationSetupProps
                 console.error("Failed to create organization");
                 alert("Failed to create organization. Please try again.");
             }
-        } catch (error) {
+        } catch (error: unknown) {
             console.error("Error creating organization:", error);
-            alert("An error occurred. Please check your connection.");
+            const message = error instanceof Error ? error.message : "An error occurred. Please check your connection.";
+            alert(message);
         } finally {
             setIsLoading(false);
         }
@@ -145,7 +149,7 @@ export default function OrganizationSetup({ onComplete }: OrganizationSetupProps
 }
 
 // Simple Icons for Select Items
-function BarChartIcon(props: any) {
+function BarChartIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
         <svg
             {...props}
@@ -166,7 +170,7 @@ function BarChartIcon(props: any) {
     )
 }
 
-function ShieldIcon(props: any) {
+function ShieldIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
         <svg
             {...props}

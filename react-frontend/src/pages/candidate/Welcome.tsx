@@ -1,5 +1,8 @@
+/**
+ * Candidate welcome: CV upload and proceed to interview. Uses sessionStorage candidate data from InviteHandler.
+ */
 import { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Upload, FileText, CheckCircle, ArrowRight, ShieldCheck } from "lucide-react";

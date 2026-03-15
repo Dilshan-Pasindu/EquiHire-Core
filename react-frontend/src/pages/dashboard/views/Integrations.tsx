@@ -1,11 +1,16 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+/**
+ * Integrations view: display cards for connected services (Asgardeo, Gemini, Supabase, etc.).
+ * Read-only status and metrics; connect/sync actions are placeholders.
+ */
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from "@/components/ui/button";
 import {  XCircle, RefreshCw, Shield, Brain, Database, Cloud, Globe, Lock, Activity } from "lucide-react";
 
 interface IntegrationCardProps {
     title: string;
     description: string;
-    icon: any;
+    icon: React.ElementType;
     status: 'connected' | 'disconnected' | 'syncing';
     category: string;
     metrics?: { label: string; value: string }[];

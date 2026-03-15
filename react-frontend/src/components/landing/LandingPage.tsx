@@ -40,7 +40,7 @@ export default function LandingPageComponent() {
                                 <button className="text-sm font-medium hover:underline underline-offset-4 hidden sm:block" onClick={() => signIn()}>
                                     Log in
                                 </button>
-                                <Button variant="outline" className="hidden sm:flex border-primary text-primary hover:bg-primary/10" onClick={() => signIn({ prompt: "create" } as any)}>
+                                <Button variant="outline" className="hidden sm:flex border-primary text-primary hover:bg-primary/10" onClick={() => signIn({ prompt: "create" })}>
                                     Register Organization
                                 </Button>
                                 <Button onClick={() => signIn()}>Get Started</Button>

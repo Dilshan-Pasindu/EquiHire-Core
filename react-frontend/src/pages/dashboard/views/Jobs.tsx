@@ -1,251 +1,168 @@
-import { useState, useEffect } from 'react';
-import { useAuthContext } from "@asgardeo/auth-react";
-import { API } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Briefcase, Edit2, Trash2, Loader2, Plus, X, Check, FileText } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { ConfirmDeleteDialog, ConfirmUpdateDialog } from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
+/**
+ * Jobs view: create job form, evaluation template selector, active roles sidebar, edit/delete dialogs.
+ * Uses useJobs for data and CRUD; SKILL_CATEGORIES from constants.
+ */
 
-// ── Skill Categories ──
-const SKILL_CATEGORIES: Record<string, string[]> = {
-    "Languages": [
-        "Python", "Java", "C++", "C#", "JavaScript", "TypeScript", "Swift", "Kotlin", "Bash"
-    ],
-    "Web & Frameworks": [
-        "React", "Angular", "Vue.js", "Node.js", "Spring Boot", "Django", "Flask", "FastAPI",
-        "React Native", "Flutter", "GraphQL", "REST API", "Microservices"
-    ],
-    "Data & AI": [
-        "Machine Learning", "Deep Learning", "NLP", "TensorFlow", "PyTorch", "Pandas",
-        "NumPy", "Scikit-learn", "Hadoop", "Spark", "Kafka", "PowerBI", "Tableau"
-    ],
-    "Infrastructure & Cloud": [
-        "AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "Jenkins",
-        "Git", "CI/CD", "Linux", "Redis"
-    ],
-    "Databases": [
-        "SQL", "NoSQL", "MongoDB", "PostgreSQL", "MySQL", "Oracle"
-    ],
-    "Tools & Agile": [
-        "Figma", "Adobe XD", "JIRA", "Agile", "Scrum"
-    ]
-};
-
-type EvaluationTemplate = {
-    id: string;
-    name: string;
-    description: string;
-    type: string;
-    prompt_template: string;
-    is_system_template: boolean;
-};
+import { useState } from 'react';
+import { useAuthContext } from '@asgardeo/auth-react';
+import { useJobs } from '@/hooks';
+import { SKILL_CATEGORIES } from '@/constants/skills';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Briefcase, Edit2, Trash2, Loader2, Plus, X, Check, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ConfirmDeleteDialog, ConfirmUpdateDialog } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
+import type { Job } from '@/types';
 
 export default function JobsManager() {
-    const { state } = useAuthContext();
-    const [jobs, setJobs] = useState<any[]>([]);
-    const [organization, setOrganization] = useState<{ id: string; name: string } | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+  const { state } = useAuthContext();
+  const userId = state.sub;
+  const {
+    jobs,
+    organization,
+    evaluationTemplates,
+    isLoading,
+    isLoadingTemplates,
+    createJob,
+    updateJob,
+    deleteJob,
+  } = useJobs({ userId });
 
-    // ── Create Job State ──
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [skills, setSkills] = useState<string[]>([]);
-    const [currentSkill, setCurrentSkill] = useState('');
-    const [activeCategory, setActiveCategory] = useState<string>("Languages");
-    const [isCreating, setIsCreating] = useState(false);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [skills, setSkills] = useState<string[]>([]);
+  const [currentSkill, setCurrentSkill] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('Languages');
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
 
-    // ── Evaluation Template State ──
-    const [evaluationTemplates, setEvaluationTemplates] = useState<EvaluationTemplate[]>([]);
-    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-    const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', description: '', requiredSkills: [] as string[] });
+  const [editActiveCategory, setEditActiveCategory] = useState('Languages');
+  const [editCustomSkill, setEditCustomSkill] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-    // ── Edit Dialog ──
-    const [editDialogOpen, setEditDialogOpen] = useState(false);
-    const [editingJob, setEditingJob] = useState<any>(null);
-    const [editForm, setEditForm] = useState({ title: '', description: '', requiredSkills: [] as string[] });
-    const [editActiveCategory, setEditActiveCategory] = useState("Languages");
-    const [editCustomSkill, setEditCustomSkill] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
+  const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    // ── Confirm Dialogs ──
-    const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
-    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-    const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+  const toggleSkill = (skill: string) => {
+    setSkills((prev) =>
+      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
+    );
+  };
 
-    // ── Data Fetching ──
-    const fetchJobs = () => {
-        if (state.sub) {
-            setIsLoading(true);
-            API.getJobs(state.sub)
-                .then(setJobs)
-                .catch(err => console.error("Failed to load jobs", err))
-                .finally(() => setIsLoading(false));
-        }
-    };
+  const handleAddCustomSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && currentSkill.trim()) {
+      e.preventDefault();
+      toggleSkill(currentSkill.trim());
+      setCurrentSkill('');
+    }
+  };
 
-    const fetchTemplates = async (orgId: string) => {
-        setIsLoadingTemplates(true);
-        try {
-            const data = await API.getEvaluationTemplates(orgId);
-            setEvaluationTemplates(data);
-        } catch (err) {
-            console.error("Failed to fetch evaluation templates", err);
-        } finally {
-            setIsLoadingTemplates(false);
-        }
-    };
+  const handleCreateJob = async () => {
+    setError('');
+    setSuccess('');
+    if (!title || !description || skills.length === 0) {
+      setError('Please fill in required fields and add at least one skill.');
+      return;
+    }
+    if (!selectedTemplateId) {
+      setError('Please select an evaluation criteria template.');
+      return;
+    }
+    if (!organization?.id || !userId) {
+      setError('Organization or recruiter information missing.');
+      return;
+    }
+    setIsCreating(true);
+    const result = await createJob({
+      title,
+      description,
+      requiredSkills: skills,
+      organizationId: organization.id,
+      recruiterId: userId,
+      evaluationTemplateId: selectedTemplateId,
+    });
+    setIsCreating(false);
+    if (result.success) {
+      setSuccess('Job role created successfully! You can now add interview questions in the Questions tab.');
+      setTitle('');
+      setDescription('');
+      setSkills([]);
+      setSelectedTemplateId('');
+    } else {
+      setError(result.error ?? 'Failed to create job.');
+    }
+  };
 
-    useEffect(() => {
-        const fetchOrg = async () => {
-            if (state.sub) {
-                try {
-                    const data = await API.getOrganization(state.sub);
-                    if (data) {
-                        setOrganization(data);
-                        fetchTemplates(data.id);
-                    }
-                } catch (error) {
-                    console.error("Failed to fetch organization", error);
-                }
-            }
-        };
-        fetchOrg();
-        fetchJobs();
-    }, [state.sub]);
+  const openEditDialog = (job: Job) => {
+    setEditingJob(job);
+    setEditForm({
+      title: job.title ?? '',
+      description: job.description ?? '',
+      requiredSkills: job.requiredSkills ?? [],
+    });
+    setEditDialogOpen(true);
+  };
 
-    // ── Create Job Handlers ──
-    const toggleSkill = (skill: string) => {
-        setSkills(prev =>
-            prev.includes(skill)
-                ? prev.filter(s => s !== skill)
-                : [...prev, skill]
-        );
-    };
+  const toggleEditSkill = (skill: string) => {
+    setEditForm((prev) => ({
+      ...prev,
+      requiredSkills: prev.requiredSkills.includes(skill)
+        ? prev.requiredSkills.filter((s) => s !== skill)
+        : [...prev.requiredSkills, skill],
+    }));
+  };
 
-    const handleAddCustomSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && currentSkill.trim()) {
-            e.preventDefault();
-            toggleSkill(currentSkill.trim());
-            setCurrentSkill('');
-        }
-    };
+  const handleEditAddCustomSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && editCustomSkill.trim()) {
+      e.preventDefault();
+      toggleEditSkill(editCustomSkill.trim());
+      setEditCustomSkill('');
+    }
+  };
 
-    const handleCreateJob = async () => {
-        setError('');
-        setSuccess('');
+  const handleSaveEdit = async () => {
+    setConfirmUpdateOpen(false);
+    if (!editingJob?.id) return;
+    setIsSaving(true);
+    try {
+      await updateJob(editingJob.id, {
+        title: editForm.title,
+        description: editForm.description,
+        requiredSkills: editForm.requiredSkills,
+      });
+    } catch (err) {
+      console.error('Failed to update job', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-        if (!title || !description || skills.length === 0) {
-            setError('Please fill in required fields and add at least one skill.');
-            return;
-        }
+  const handleDelete = async () => {
+    setConfirmDeleteOpen(false);
+    if (!deletingJobId) return;
+    setIsDeleting(true);
+    try {
+      await deleteJob(deletingJobId);
+    } catch (err) {
+      console.error('Failed to delete job', err);
+    } finally {
+      setIsDeleting(false);
+      setDeletingJobId(null);
+    }
+  };
 
-        if (!selectedTemplateId) {
-            setError('Please select an evaluation criteria template.');
-            return;
-        }
-
-        if (!organization?.id || !state.sub) {
-            setError('Organization or recruiter information missing.');
-            return;
-        }
-
-        setIsCreating(true);
-        try {
-            const jobPayload = {
-                title,
-                description,
-                requiredSkills: skills,
-                organizationId: organization.id,
-                recruiterId: state.sub,
-                evaluationTemplateId: selectedTemplateId,
-            };
-
-            await API.createJob(jobPayload);
-            setSuccess('Job role created successfully! You can now add interview questions in the Questions tab.');
-            setTitle('');
-            setDescription('');
-            setSkills([]);
-            setSelectedTemplateId('');
-            fetchJobs();
-        } catch (err: any) {
-            console.error(err);
-            setError(err.message || 'Failed to create job.');
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    // ── Edit Job Handlers ──
-    const openEditDialog = (job: any) => {
-        setEditingJob(job);
-        setEditForm({
-            title: job.title || '',
-            description: job.description || '',
-            requiredSkills: job.required_skills || job.requiredSkills || [],
-        });
-        setEditDialogOpen(true);
-    };
-
-    const toggleEditSkill = (skill: string) => {
-        setEditForm(prev => ({
-            ...prev,
-            requiredSkills: prev.requiredSkills.includes(skill)
-                ? prev.requiredSkills.filter(s => s !== skill)
-                : [...prev.requiredSkills, skill]
-        }));
-    };
-
-    const handleEditAddCustomSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && editCustomSkill.trim()) {
-            e.preventDefault();
-            toggleEditSkill(editCustomSkill.trim());
-            setEditCustomSkill('');
-        }
-    };
-
-    const handleSaveEdit = async () => {
-        setConfirmUpdateOpen(false);
-        if (!editingJob) return;
-        setIsSaving(true);
-        try {
-            await API.updateJob(editingJob.id, {
-                title: editForm.title,
-                description: editForm.description,
-                requiredSkills: editForm.requiredSkills,
-            });
-            fetchJobs();
-        } catch (err) {
-            console.error("Failed to update job", err);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleDelete = async () => {
-        setConfirmDeleteOpen(false);
-        if (!deletingJobId) return;
-        setIsDeleting(true);
-        try {
-            await API.deleteJob(deletingJobId);
-            fetchJobs();
-        } catch (err) {
-            console.error("Failed to delete job", err);
-        } finally {
-            setIsDeleting(false);
-            setDeletingJobId(null);
-        }
-    };
-
-    // ── Helper: Get selected template details ──
-    const selectedTemplate = evaluationTemplates.find(t => t.id === selectedTemplateId);
+  const selectedTemplate = evaluationTemplates.find((t) => t.id === selectedTemplateId);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -389,7 +306,7 @@ export default function JobsManager() {
                                             </div>
                                         ) : (
                                             evaluationTemplates.map((template) => (
-                                                <SelectItem key={template.id} value={template.id}>
+                                                <SelectItem key={template.id || 'default'} value={template.id || ''}>
                                                     <div className="flex items-center gap-2">
                                                         {template.is_system_template && (
                                                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
@@ -448,7 +365,7 @@ export default function JobsManager() {
                                                 <Briefcase className="h-4 w-4 mr-3 text-gray-400 flex-shrink-0" />
                                                 <div className="min-w-0">
                                                     <p className="font-medium text-sm text-gray-900 truncate">{job.title}</p>
-                                                    <p className="text-xs text-gray-500">{new Date(job.created_at).toLocaleDateString()}</p>
+                                                    <p className="text-xs text-gray-500">{job.id ? "Draft" : "Published"}</p>
                                                 </div>
                                             </div>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
@@ -458,8 +375,8 @@ export default function JobsManager() {
                                                 >
                                                     <Edit2 className="w-3 h-3" />
                                                 </button>
-                                                <button
-                                                    onClick={() => { setDeletingJobId(job.id); setConfirmDeleteOpen(true); }}
+                                                 <button
+                                                    onClick={() => { if (job.id) { setDeletingJobId(job.id); setConfirmDeleteOpen(true); } }}
                                                     className="p-1 rounded bg-white border border-gray-200 shadow-sm hover:bg-red-50 hover:border-red-400 hover:text-red-600 text-gray-400 transition-all"
                                                 >
                                                     <Trash2 className="w-3 h-3" />
