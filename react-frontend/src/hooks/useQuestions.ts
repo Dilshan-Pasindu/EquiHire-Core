@@ -7,8 +7,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { API } from '@/lib/api';
 import type { Job, Question } from '@/types';
 
-/** Job with optional organization_id for question creation. */
-export type JobWithOrg = Job & { organization_id?: string };
+/** Job with optional organizationId for question creation. */
+export type JobWithOrg = Job & { organizationId?: string };
 
 export interface UseQuestionsOptions {
   userId: string | undefined;

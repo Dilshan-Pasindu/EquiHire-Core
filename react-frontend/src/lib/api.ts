@@ -17,11 +17,11 @@ import type {
   QuestionPayload,
   CreateInvitationPayload,
   CreateEvaluationTemplatePayload,
-  CandidateAnswerPayload,
   UploadCvResponse,
+  StartSessionResponse,
+  SubmitAssessmentPayload,
 } from '@/types';
 
-/** Re-export types for consumers that still import from lib/api. */
 export type {
   Job,
   Question,
@@ -62,13 +62,12 @@ export async function createOrganization(data: CreateOrganizationPayload): Promi
  */
 export async function updateOrganization(
   orgId: string,
-  data: UpdateOrganizationPayload,
-  userId: string
+  data: UpdateOrganizationPayload
 ): Promise<Response> {
-  const response = await fetch(`${API_BASE_URL}/organization?userId=${userId}`, {
+  const response = await fetch(`${API_BASE_URL}/organization`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...data, id: orgId }),
+    body: JSON.stringify({ ...data, organizationId: orgId }),
   });
   if (!response.ok) throw new Error('Failed to update organization');
   return response;
@@ -165,7 +164,7 @@ export async function createEvaluationTemplate(
   const response = await fetch(`${API_BASE_URL}/evaluation-templates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...data, organization_id: orgId }),
+    body: JSON.stringify({ ...data, organizationId: orgId }),
   });
   if (!response.ok) throw new Error('Failed to create evaluation template');
   return response.json();
@@ -182,7 +181,7 @@ export async function updateEvaluationTemplate(
   const response = await fetch(`${API_BASE_URL}/evaluation-templates/${templateId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...data, organization_id: orgId }),
+    body: JSON.stringify({ ...data, organizationId: orgId }),
   });
   if (!response.ok) throw new Error('Failed to update evaluation template');
 }
@@ -191,10 +190,11 @@ export async function updateEvaluationTemplate(
  * Deletes an evaluation template.
  */
 export async function deleteEvaluationTemplate(orgId: string, templateId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/evaluation-templates/${templateId}?organizationId=${orgId}`,
-    { method: 'DELETE' }
-  );
+  const response = await fetch(`${API_BASE_URL}/evaluation-templates/${templateId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ organizationId: orgId }),
+  });
   if (!response.ok) throw new Error('Failed to delete evaluation template');
 }
 
@@ -235,17 +235,32 @@ export async function validateInvitation(token: string): Promise<import('@/types
 }
 
 /**
- * Submits candidate answers for evaluation (interview completion).
+ * Creates a new exam session when the candidate enters the interview.
+ */
+export async function startExamSession(
+  candidateId: string,
+  payload: { jobId: string; invitationId: string }
+): Promise<StartSessionResponse> {
+  const response = await fetch(`${API_BASE_URL}/candidates/${candidateId}/start-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to start exam session');
+  return response.json();
+}
+
+/**
+ * Submits candidate answers for evaluation (interview completion) and logs cheat events.
  */
 export async function submitCandidateAnswers(
   candidateId: string,
-  jobId: string,
-  answers: CandidateAnswerPayload[]
+  payload: SubmitAssessmentPayload
 ): Promise<unknown> {
   const response = await fetch(`${API_BASE_URL}/candidates/${candidateId}/evaluate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jobId, answers }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to submit answers');
   return response.json();
@@ -352,6 +367,7 @@ export const API = {
   getInvitations,
   uploadCv,
   validateInvitation,
+  startExamSession,
   submitCandidateAnswers,
   getCandidates,
   decideCandidate,

@@ -37,7 +37,8 @@ export default function InviteHandler() {
                     name: data.candidateName,
                     jobTitle: data.jobTitle,
                     organizationId: data.organizationId,
-                    jobId: data.jobId
+                    jobId: data.jobId,
+                    invitationId: data.invitationId
                 }));
 
                 // Also store the token just in case we need to reference it

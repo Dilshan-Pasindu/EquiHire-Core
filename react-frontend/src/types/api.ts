@@ -47,4 +47,35 @@ export interface ValidateInvitationResponse {
   jobTitle?: string;
   organizationId?: string;
   jobId?: string;
+  invitationId?: string;
+}
+
+/** Assessment Pipeline: Single cheat event (lockdown violation). */
+export interface CheatEventItem {
+  eventType: 'tab_switch' | 'copy_attempt' | 'paste_attempt' | 'right_click' | 'fullscreen_exit';
+  occurredAt: string; // ISO 8601
+  details?: unknown;
+}
+
+/** Assessment Pipeline: Extended answer submission format. */
+export interface AnswerSubmission {
+  questionId: string;
+  answerText: string;
+  timeSpentSeconds?: number;
+}
+
+/** Assessment Pipeline: Submit Evaluation Payload. */
+export interface SubmitAssessmentPayload {
+  jobId: string;
+  sessionId: string;
+  invitationId: string;
+  submissionType: 'manual' | 'timer_expired';
+  answers: AnswerSubmission[];
+  cheatEvents: CheatEventItem[];
+}
+
+/** Assessment Pipeline: Response for starting an exam session. */
+export interface StartSessionResponse {
+  sessionId: string;
+  status: string;
 }

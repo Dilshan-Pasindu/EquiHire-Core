@@ -73,7 +73,7 @@ export function useOrganization({ userId }: UseOrganizationOptions): UseOrganiza
     async (payload: UpdateOrganizationPayload): Promise<boolean> => {
       if (!organization?.id || !userId) return false;
       try {
-        const response = await API.updateOrganization(organization.id, payload, userId);
+        const response = await API.updateOrganization(organization.id, payload);
         if (response.ok) {
           setOrganization((prev) => (prev ? { ...prev, ...payload } : null));
           return true;

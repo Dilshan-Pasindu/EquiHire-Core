@@ -34,4 +34,8 @@ export type {
   ValidateInvitationResponse,
   ParsedCv,
   UploadCvResponse,
+  CheatEventItem,
+  AnswerSubmission,
+  SubmitAssessmentPayload,
+  StartSessionResponse,
 } from './api';

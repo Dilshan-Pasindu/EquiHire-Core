@@ -61,7 +61,7 @@ export default function Questions() {
       .filter(Boolean);
     const result = await addQuestion({
       jobId: selectedJobId,
-      organizationId: selectedJob.organization_id,
+      organizationId: selectedJob.organizationId,
       questionText,
       sampleAnswer,
       keywords,
