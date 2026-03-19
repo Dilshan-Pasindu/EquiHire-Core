@@ -91,6 +91,17 @@ public function getOrgIdByJob(string jobId) returns string|error {
     return (<map<json>>rows[0])["organization_id"].toString();
 }
 
+public function getEvaluationTemplateIdForJob(string jobId) returns string?|error {
+    string path = string `/rest/v1/jobs?select=evaluation_template_id&id=eq.${jobId}`;
+    http:Response response = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    if response.statusCode >= 300 { return error("getEvaluationTemplateIdForJob failed"); }
+    json[] rows = <json[]>check response.getJsonPayload();
+    if rows.length() == 0 { return error("Job not found: " + jobId); }
+    json evalId = (<map<json>>rows[0])["evaluation_template_id"];
+    return evalId is () ? () : evalId.toString();
+}
+
 // ---------------------------------------------------------------------------
 // Questions
 // ---------------------------------------------------------------------------
@@ -164,6 +175,17 @@ public function getEvaluationTemplates(string organizationId) returns json[]|err
         path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
     if response.statusCode >= 300 { return error("getEvaluationTemplates failed"); }
     return <json[]>check response.getJsonPayload();
+}
+
+public function getEvaluationTemplatePrompt(string templateId) returns string|error {
+    string path = string `/rest/v1/evaluation_templates?id=eq.${templateId}&select=prompt_template`;
+    http:Response response = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    if response.statusCode >= 300 { return error("getEvaluationTemplatePrompt failed"); }
+    json[] rows = <json[]>check response.getJsonPayload();
+    if rows.length() == 0 { return error("Template not found: " + templateId); }
+    json prompt = (<map<json>>rows[0])["prompt_template"];
+    return prompt is () ? "" : prompt.toString();
 }
 
 public function createEvaluationTemplate(string name, string description, string 'type,

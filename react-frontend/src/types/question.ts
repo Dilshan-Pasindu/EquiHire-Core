@@ -2,8 +2,8 @@
  * @fileoverview Interview question types for job questionnaires.
  */
 
-/** Question type: text (paragraph) or code (coding challenge). */
-export type QuestionType = 'text' | 'code';
+/** Question type: paragraph (text response) or code (coding challenge). */
+export type QuestionType = 'paragraph' | 'code';
 
 /**
  * Interview question attached to a job.

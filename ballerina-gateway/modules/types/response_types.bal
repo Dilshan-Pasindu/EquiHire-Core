@@ -96,6 +96,11 @@ public type CandidateResponse record {|
     string? experienceLevel = ();
     string[] detectedStack = [];
     int hfRelevanceSkipped = 0;
+    int cheatEventCount = 0;
+    string? cvText = ();
+    json? education = ();
+    json? workExperience = ();
+    json? projects = ();
 |};
 
 // Pass/fail decision response.

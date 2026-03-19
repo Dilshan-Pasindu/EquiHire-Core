@@ -330,6 +330,16 @@ service /api on apiListener {
         };
     }
 
+    // --- Evaluate CV Match ---
+    resource function post candidates/[string candidateId]/evaluate\-cv()
+            returns json|http:InternalServerError {
+        json|error result = services:evaluateCandidateCv(candidateId);
+        if result is error {
+            return <http:InternalServerError>{body: {"error": result.message()}};
+        }
+        return {"status": "success"};
+    }
+
     // --- Audit Logs ---
     resource function get organizations/[string organizationId]/audit\-logs()
             returns json|http:InternalServerError {

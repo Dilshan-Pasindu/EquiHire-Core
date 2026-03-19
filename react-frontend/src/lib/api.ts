@@ -349,6 +349,18 @@ export async function flagCheating(
   return response.json();
 }
 
+/**
+ * Triggers a manual AI evaluation of a candidate's CV against the job's Marking Criteria.
+ */
+export async function evaluateCandidateCV(candidateId: string): Promise<Response> {
+  const response = await fetch(`${API_BASE_URL}/candidates/${candidateId}/evaluate-cv`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Failed to evaluate candidate CV');
+  return response;
+}
+
 /** Legacy API object for backward compatibility (calls the above functions). */
 export const API = {
   getOrganization,
@@ -376,4 +388,5 @@ export const API = {
   updateQuestion,
   getAuditLogs,
   flagCheating,
+  evaluateCandidateCV,
 };

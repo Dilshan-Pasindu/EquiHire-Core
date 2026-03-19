@@ -100,12 +100,10 @@ export function useQuestions({ userId }: UseQuestionsOptions): UseQuestionsResul
         await API.createJobQuestions([
           {
             jobId: params.jobId,
-            organizationId: params.organizationId,
             questionText: params.questionText,
             sampleAnswer: params.sampleAnswer,
             keywords: params.keywords,
-            type: params.questionType as 'text' | 'code',
-            sortOrder: params.sortOrder,
+            type: params.questionType as import('@/types').QuestionType,
           },
         ] as unknown as import('@/types').QuestionPayload[]);
         await fetchQuestions(params.jobId);

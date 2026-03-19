@@ -301,3 +301,58 @@ function logAuditAsync(string candidateId, string jobId, int answerCount) {
             {"jobId": jobId, "answerCount": answerCount});
     }
 }
+
+public function evaluateCandidateCv(string candidateId) returns json|error {
+    // 1. Get Job ID
+    string|error jobId = repositories:getJobIdForCandidate(candidateId);
+    if jobId is error { return error("Could not find Job ID for candidate: " + candidateId); }
+
+    // 2. Get Job rules / Evaluation Template
+    string?|error templateId = repositories:getEvaluationTemplateIdForJob(jobId);
+    if templateId is error { return error("Failed to get evaluation template ID for job"); }
+    
+    string markingCriteria = "No specific marking criteria provided. Evaluate the general fitness of this CV for a technical role.";
+    if templateId is string && templateId != "" {
+        string|error promptStr = repositories:getEvaluationTemplatePrompt(templateId);
+        if promptStr is string && promptStr != "" { 
+            markingCriteria = promptStr; 
+        }
+    }
+
+    // 3. Get CV Text
+    string|error cvText = repositories:getCvRawText(candidateId);
+    if cvText is error || cvText == "" { return error("CV text is empty or missing for candidate: " + candidateId); }
+
+    // 4. Construct Gemini Prompt
+    string prompt = "You are an expert technical recruiter evaluating an applicant's CV against the job's strict marking criteria. \n" +
+                    "Return ONLY a valid JSON object in this exact structure: {\"score\": <0-100 integer>, \"feedback\": \"<detailed constructive feedback explaining the match>\"}.\n\n";
+    prompt += "Marking Criteria:\n" + markingCriteria + "\n\n";
+    prompt += "Candidate CV Text:\n" + cvText;
+
+    // 5. Call Gemini
+    string url = string `/models/${constants:GEMINI_MODEL}:generateContent?key=${config:geminiApiKey}`;
+    json|error aiEval = callGeminiRaw(url, prompt, candidateId, "CV_EVAL", 1);
+    
+    if aiEval is error {
+        log:printWarn("Gemini CV evaluation failed on attempt 1, retrying...", candidateId = candidateId);
+        aiEval = callGeminiRaw(url, prompt, candidateId, "CV_EVAL", 2);
+    }
+
+    if aiEval is map<json> {
+        int finalScore = parseScore(aiEval["score"]);
+        string finalFeedback = aiEval["feedback"] is string ? <string>aiEval["feedback"] : "CV successfully evaluated.";
+        string recStatus = <float>finalScore >= constants:PASS_THRESHOLD ? constants:STATUS_SHORTLISTED : constants:STATUS_REJECTED;
+        
+        // 6. Save or update evaluation_results
+        error? upsertErr = repositories:upsertCvEvaluationResult(candidateId, jobId, <float>finalScore, finalFeedback, recStatus);
+        if upsertErr is error {
+            log:printError("upsertCvEvaluationResult failed", 'error = upsertErr, candidateId = candidateId);
+            return error("Failed to save CV evaluation results to database");
+        }
+        
+        return {"score": finalScore, "feedback": finalFeedback, "status": recStatus};
+    } else {
+        log:printError("Gemini grading failed after retry — cannot evaluate CV", candidateId = candidateId);
+        return error("AI Evaluation failed to return a valid result.");
+    }
+}

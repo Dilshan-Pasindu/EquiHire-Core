@@ -26,6 +26,12 @@ export interface ExtendedCandidate {
   cvScore?: number;
   skillsScore?: number;
   interviewScore?: number;
+  cvText?: string;
+  education?: any;
+  workExperience?: any;
+  projects?: any;
+  summaryFeedback?: string;
+  cheatEventCount?: number;
 }
 
 /** Filter for activity: all, only seen, or only unseen */

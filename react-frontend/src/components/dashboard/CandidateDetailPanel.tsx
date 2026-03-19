@@ -19,6 +19,7 @@ export interface CandidateDetailPanelProps {
   isProcessing: boolean;
   onClose: () => void;
   onApplyDecision: (candidateId: string) => Promise<void>;
+  onEvaluateCV?: (candidateId: string) => Promise<void>;
 }
 
 const AVATAR_URL = 'https://api.dicebear.com/7.x/avataaars/svg';
@@ -29,6 +30,7 @@ export function CandidateDetailPanel({
   isProcessing,
   onClose,
   onApplyDecision,
+  onEvaluateCV,
 }: CandidateDetailPanelProps) {
   const meetsThreshold = candidate.score >= threshold;
 
@@ -104,6 +106,24 @@ export function CandidateDetailPanel({
             )}
           </section>
 
+          {/* AI Feedback */}
+          {candidate.summaryFeedback && (
+            <section aria-labelledby="feedback-heading">
+              <h4 id="feedback-heading" className="text-sm font-bold text-gray-900 mb-2">
+                AI Evaluation Feedback
+              </h4>
+              <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-lg italic text-sm text-blue-900 leading-relaxed shadow-sm">
+                "{candidate.summaryFeedback.replace(/Candidate scored \d+(\.\d+)?\/100\./g, '').trim()}"
+                {candidate.score > 0 && (
+                  <div className="not-italic mt-2 pt-2 border-t border-blue-100 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-blue-700">Official Score:</span>
+                    <span className="font-bold text-blue-900">{candidate.score}/100</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* Candidate context (experience, stack) */}
           {candidate.experienceLevel && (
             <section aria-labelledby="context-heading">
@@ -138,18 +158,89 @@ export function CandidateDetailPanel({
             </section>
           )}
 
+          {/* CV Details */}
+          {(candidate.education || candidate.workExperience || candidate.projects) && (
+            <section aria-labelledby="cv-heading">
+              <h4 id="cv-heading" className="text-sm font-bold text-gray-900 mb-2">
+                CV Highlights
+              </h4>
+              <div className="bg-white border border-gray-200 p-3 rounded-lg shadow-sm space-y-4">
+                {candidate.education && (
+                   <div>
+                     <span className="text-xs font-semibold text-gray-700 block mb-1">Education</span>
+                     <div className="text-xs text-gray-600 pl-2 border-l-2 border-gray-100 space-y-1">
+                       {Array.isArray(candidate.education) ? (
+                         candidate.education.map((edu, i) => (
+                           <div key={i} className="mb-2">
+                             <p className="font-bold">{typeof edu === 'string' ? edu : edu.degree || edu.institution}</p>
+                             {typeof edu === 'object' && <p className="text-[10px] text-gray-500">{edu.field || edu.major} • {edu.duration || edu.year}</p>}
+                           </div>
+                         ))
+                       ) : typeof candidate.education === 'string' ? (
+                         <p>{candidate.education}</p>
+                       ) : (
+                         <pre className="whitespace-pre-wrap font-sans">{JSON.stringify(candidate.education, null, 2)}</pre>
+                       )}
+                     </div>
+                   </div>
+                )}
+                {candidate.workExperience && (
+                   <div>
+                     <span className="text-xs font-semibold text-gray-700 block mb-1">Work Experience</span>
+                     <div className="text-xs text-gray-600 pl-2 border-l-2 border-gray-100 space-y-2">
+                       {Array.isArray(candidate.workExperience) ? (
+                         candidate.workExperience.map((job, i) => (
+                           <div key={i} className="mb-2">
+                             <p className="font-bold">{typeof job === 'string' ? job : job.title || job.position}</p>
+                             {typeof job === 'object' && <p className="text-[10px] text-gray-500">{job.company || job.organization} • {job.duration || job.period}</p>}
+                           </div>
+                         ))
+                       ) : typeof candidate.workExperience === 'string' ? (
+                         <p>{candidate.workExperience}</p>
+                       ) : (
+                         <pre className="whitespace-pre-wrap font-sans">{JSON.stringify(candidate.workExperience, null, 2)}</pre>
+                       )}
+                     </div>
+                   </div>
+                )}
+                {candidate.projects && (
+                   <div>
+                     <span className="text-xs font-semibold text-gray-700 block mb-1">Projects</span>
+                     <div className="text-xs text-gray-600 pl-2 border-l-2 border-gray-100 space-y-1">
+                       {Array.isArray(candidate.projects) ? (
+                         candidate.projects.map((proj, i) => (
+                           <div key={i} className="mb-2">
+                             <p className="font-bold">{typeof proj === 'string' ? proj : proj.name || proj.title}</p>
+                             {typeof proj === 'object' && <p className="text-[10px] text-gray-500">{proj.description}</p>}
+                           </div>
+                         ))
+                       ) : typeof candidate.projects === 'string' ? (
+                         <p>{candidate.projects}</p>
+                       ) : (
+                         <pre className="whitespace-pre-wrap font-sans">{JSON.stringify(candidate.projects, null, 2)}</pre>
+                       )}
+                     </div>
+                   </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* HF relevance / suspicious answers alert */}
-          {candidate.hfRelevanceSkipped > 0 && (
+          {(candidate.hfRelevanceSkipped > 0 || (candidate.cheatEventCount && candidate.cheatEventCount > 0)) && (
             <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-r-lg" role="alert">
               <div className="flex gap-2">
                 <XCircle className="w-5 h-5 text-red-500 shrink-0" aria-hidden />
                 <div>
-                  <p className="text-xs font-bold text-red-800">Suspicious Answers Detected</p>
-                  <p className="text-[11px] text-red-600 mt-0.5">
-                    {candidate.hfRelevanceSkipped} answer(s) failed the relevance check and were
-                    flagged as gibberish or AI-generated bypass attempts. They received an automatic
-                    score of 0.
-                  </p>
+                  <p className="text-xs font-bold text-red-800">Violation Flags Detected</p>
+                  <div className="text-[11px] text-red-600 mt-1 space-y-1">
+                    {candidate.hfRelevanceSkipped > 0 && (
+                      <p>• {candidate.hfRelevanceSkipped} answer(s) failed the relevance check (gibberish/bypass attempts).</p>
+                    )}
+                    {candidate.cheatEventCount && candidate.cheatEventCount > 0 && (
+                      <p>• {candidate.cheatEventCount} interface violation(s) (tab switching/paste/fullscreen exit).</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -160,43 +251,70 @@ export function CandidateDetailPanel({
             <h4 id="timeline-heading" className="text-sm font-bold text-gray-900 mb-4 flex items-center">
               <Clock className="w-4 h-4 mr-2 text-gray-500" aria-hidden /> Timeline
             </h4>
-            <div className="relative pl-4 border-l-2 border-gray-100 space-y-6">
+            <div className="relative pl-4 border-l-2 border-gray-100 space-y-8">
               <div className="relative">
                 <div className="absolute -left-[21px] top-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white ring-2 ring-gray-50" />
-                <p className="text-sm font-medium text-gray-900">Application Received</p>
-                <p className="text-xs text-gray-500">
-                  {new Date(candidate.appliedDate).toLocaleDateString()}
+                <p className="text-sm font-black text-gray-900 leading-none">Application Received</p>
+                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">
+                  {new Date(candidate.appliedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </p>
               </div>
               <div className="relative">
                 <div
-                  className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ring-2 ring-gray-50 ${candidate.score > 0 ? 'bg-green-500' : 'bg-gray-300'}`}
+                  className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ring-2 ring-gray-50 ${candidate.score > 0 ? 'bg-green-500' : 'bg-orange-400 animate-pulse'}`}
                 />
-                <p className="text-sm font-medium text-gray-900">Interview Session</p>
-                <p className="text-xs text-gray-500">
-                  {candidate.score > 0 ? 'Completed' : 'Scheduled'}
-                </p>
+                <div className="flex flex-col">
+                  <p className="text-sm font-black text-gray-900 leading-none">Interview Session</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${candidate.score > 0 ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
+                      {candidate.score > 0 ? 'Completed' : 'Scheduled / In-Progress'}
+                    </span>
+                    {candidate.score > 0 && <span className="text-[10px] font-medium text-gray-400">Score: {candidate.score}%</span>}
+                  </div>
+                </div>
               </div>
               <div className="relative">
                 <div
-                  className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ring-2 ring-gray-50 ${candidate.status !== 'pending' && candidate.status !== 'scheduled' ? 'bg-green-500' : 'bg-gray-300'}`}
+                  className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 border-white ring-2 ring-gray-50 ${candidate.status !== 'pending' && candidate.status !== 'scheduled' ? (candidate.status === 'accepted' ? 'bg-green-500' : 'bg-red-500') : 'bg-gray-200'}`}
                 />
-                <p className="text-sm font-medium text-gray-900">Final Decision</p>
-                <p className="text-xs text-gray-500">
-                  {candidate.status === 'pending'
-                    ? 'Pending Review'
-                    : candidate.status === 'accepted'
-                      ? 'Accepted'
-                      : candidate.status === 'rejected'
-                        ? 'Rejected'
-                        : 'Pending'}
-                </p>
+                <div className="flex flex-col">
+                   <p className="text-sm font-black text-gray-900 leading-none">Final Decision</p>
+                   <div className="mt-1">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider 
+                        ${candidate.status === 'accepted' ? 'bg-green-50 text-green-600' : 
+                          candidate.status === 'rejected' ? 'bg-red-50 text-red-600' : 
+                          'bg-gray-50 text-gray-500'}`}>
+                        {candidate.status === 'pending'
+                          ? 'Review Pending'
+                          : candidate.status === 'accepted'
+                            ? 'Accepted'
+                            : candidate.status === 'rejected'
+                              ? 'Rejected'
+                              : 'Pending'}
+                      </span>
+                   </div>
+                </div>
               </div>
             </div>
           </section>
 
           {/* Actions */}
           <div className="pt-4 border-t border-gray-100 flex flex-col gap-2">
+            {candidate.status === 'pending' && onEvaluateCV && (
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => onEvaluateCV(candidate.candidateId)}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" aria-hidden />
+                ) : (
+                  <FileText className="w-4 h-4 mr-2" aria-hidden />
+                )}
+                Evaluate AI Match
+              </Button>
+            )}
+            
             {candidate.status === 'pending' && candidate.score > 0 && (
               <Button
                 className={`w-full ${meetsThreshold ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}`}

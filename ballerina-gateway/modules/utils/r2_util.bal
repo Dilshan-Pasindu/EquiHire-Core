@@ -20,9 +20,10 @@ public function uploadBytesToR2(types:R2Config cfg, byte[] content, string objec
 
     string canonicalUri = "/" + cfg.bucketName + "/" + objectKey;
     string canonicalQueryString = "";
-    string canonicalHeaders = "content-type:application/octet-stream\nhost:" + host +
+    string canonicalHeaders = "content-length:" + content.length().toString() + 
+        "\ncontent-type:application/octet-stream\nhost:" + host +
         "\nx-amz-content-sha256:" + payloadHash + "\nx-amz-date:" + amzDate + "\n";
-    string signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+    string signedHeaders = "content-length;content-type;host;x-amz-content-sha256;x-amz-date";
 
     string canonicalRequest = "PUT\n" + canonicalUri + "\n" + canonicalQueryString + "\n" +
         canonicalHeaders + "\n" + signedHeaders + "\n" + payloadHash;
@@ -44,6 +45,7 @@ public function uploadBytesToR2(types:R2Config cfg, byte[] content, string objec
         "x-amz-date": amzDate,
         "x-amz-content-sha256": payloadHash,
         "Content-Type": "application/octet-stream",
+        "Content-Length": content.length().toString(),
         "Host": host
     };
 

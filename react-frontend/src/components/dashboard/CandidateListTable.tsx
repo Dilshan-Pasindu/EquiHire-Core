@@ -1,4 +1,4 @@
-import { Lock, Unlock, ChevronRight } from 'lucide-react';
+import { Lock, Unlock, ChevronRight, XCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCandidateStatusClasses } from '@/lib/utils';
@@ -94,11 +94,19 @@ export function CandidateListTable({
                         >
                           {c.candidateName}
                         </span>
-                        {!c.seen && (
-                          <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wide">
-                            New Update
-                          </span>
-                        )}
+                        <div className="flex gap-2 items-center mt-1">
+                          {!c.seen && (
+                            <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wide">
+                              New Update
+                            </span>
+                          )}
+                          {(c.hfRelevanceSkipped > 0 || (c.cheatEventCount && c.cheatEventCount > 0)) && (
+                            <span className="flex items-center gap-1 text-[10px] text-red-600 font-bold uppercase bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
+                              <XCircle className="w-3 h-3" />
+                              Violation
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>

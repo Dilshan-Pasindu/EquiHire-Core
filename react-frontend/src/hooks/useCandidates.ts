@@ -38,6 +38,8 @@ export interface UseCandidatesResult {
   handleViewDetails: (candidate: ExtendedCandidate) => void;
   /** Apply accept/reject decision and refresh list */
   handleApplyDecision: (candidateId: string) => Promise<void>;
+  /** Trigger manual AI evaluation of candidate CV against Marking Criteria */
+  handleEvaluateCV: (candidateId: string) => Promise<void>;
   /** Refetch candidates (e.g. after decision) */
   refreshCandidates: () => Promise<void>;
 }
@@ -119,7 +121,11 @@ export function useCandidates({ userId }: UseCandidatesOptions): UseCandidatesRe
       try {
         await API.decideCandidate(candidateId, threshold);
         await fetchCandidates(orgId);
-        setSelectedCandidate(null);
+        
+        // Refresh the selected candidate to show revealed PII
+        const updatedCandidates = await API.getCandidates(orgId) as unknown as ExtendedCandidate[];
+        const updated = updatedCandidates.find(c => c.candidateId === candidateId);
+        if (updated) setSelectedCandidate(updated);
       } catch (error) {
         console.error('Decision failed:', error);
       } finally {
@@ -127,6 +133,28 @@ export function useCandidates({ userId }: UseCandidatesOptions): UseCandidatesRe
       }
     },
     [threshold, orgId, fetchCandidates]
+  );
+
+  const handleEvaluateCV = useCallback(
+    async (candidateId: string) => {
+      setIsProcessing(true);
+      try {
+        await API.evaluateCandidateCV(candidateId);
+        await fetchCandidates(orgId);
+        
+        // Update the selected candidate state if it's currently open
+        if (selectedCandidate?.candidateId === candidateId) {
+            const updatedCandidates = await API.getCandidates(orgId) as unknown as ExtendedCandidate[];
+            const updated = updatedCandidates.find(c => c.candidateId === candidateId);
+            if (updated) setSelectedCandidate(updated);
+        }
+      } catch (error) {
+        console.error('Evaluate CV failed:', error);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [orgId, fetchCandidates, selectedCandidate]
   );
 
   return {
@@ -145,6 +173,7 @@ export function useCandidates({ userId }: UseCandidatesOptions): UseCandidatesRe
     setSelectedCandidate,
     handleViewDetails,
     handleApplyDecision,
+    handleEvaluateCV,
     refreshCandidates,
   };
 }

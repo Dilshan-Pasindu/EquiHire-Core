@@ -57,6 +57,24 @@ public function insertEvaluationResult(string candidateId, string jobId, float i
     }
 }
 
+public function upsertCvEvaluationResult(string candidateId, string jobId, float cvScore,
+                                         string summaryFeedback, string recommendedStatus) returns error? {
+    json payload = {
+        "candidate_id":       candidateId,
+        "job_id":             jobId,
+        "cv_score":           cvScore,
+        "overall_score":      cvScore, // Simplified for now
+        "summary_feedback":   summaryFeedback,
+        "recommended_status": recommendedStatus
+    };
+    http:Response response = check clients:supabaseHttpClient->post(
+        "/rest/v1/evaluation_results", payload, headers = clients:getSupabaseUpsertHeaders());
+    if response.statusCode >= 300 {
+        json err = check response.getJsonPayload();
+        return error("upsertCvEvaluationResult failed for candidate " + candidateId + ": " + err.toString());
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Audit Logs
 // ---------------------------------------------------------------------------

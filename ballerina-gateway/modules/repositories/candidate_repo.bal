@@ -133,8 +133,29 @@ public function insertSecureIdentity(string candidateId, string r2ObjectKey) ret
 }
 
 // ---------------------------------------------------------------------------
-// Candidate Decision Support
+// Candidate Decision Support & Evaluation
 // ---------------------------------------------------------------------------
+
+public function getJobIdForCandidate(string candidateId) returns string|error {
+    string path = string `/rest/v1/anonymous_profiles?candidate_id=eq.${candidateId}&select=job_id`;
+    http:Response response = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    if response.statusCode >= 300 { return error("getJobIdForCandidate failed"); }
+    json[] rows = <json[]>check response.getJsonPayload();
+    if rows.length() == 0 { return error("Candidate not found: " + candidateId); }
+    return (<map<json>>rows[0])["job_id"].toString();
+}
+
+public function getCvRawText(string candidateId) returns string|error {
+    string path = string `/rest/v1/cv_parsed_sections?candidate_id=eq.${candidateId}&select=raw_text`;
+    http:Response response = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    if response.statusCode >= 300 { return error("getCvRawText failed"); }
+    json[] rows = <json[]>check response.getJsonPayload();
+    if rows.length() == 0 { return error("CV not found for candidate: " + candidateId); }
+    json rawText = (<map<json>>rows[0])["raw_text"];
+    return rawText is () ? "" : rawText.toString();
+}
 
 public function getCandidateContact(string candidateId) returns record {|string candidateName; string candidateEmail; string jobTitle;|}|error {
     string profPath = string `/rest/v1/anonymous_profiles?candidate_id=eq.${candidateId}&select=invitation_id`;
@@ -247,8 +268,10 @@ public function getCandidates(string organizationId) returns types:CandidateResp
     map<map<json>> evalMap = check fetchEvalMap(jobIdsFilter);
     map<string> invMap = check fetchInvitationNameMap(organizationId);
     map<map<json>> ctxMap = check fetchContextMap(jobIdsFilter);
+    map<map<json>> cvMap = check fetchCvParsedMap(jobIdsFilter);
+    map<int> cheatMap = check fetchCheatMap(jobIdsFilter);
 
-    return assembleCandidateList(profiles, jobTitleMap, evalMap, invMap, ctxMap);
+    return assembleCandidateList(profiles, jobTitleMap, evalMap, invMap, ctxMap, cvMap, cheatMap);
 }
 
 function fetchOrgJobs(string organizationId) returns [json[], map<string>]|error {
@@ -330,9 +353,42 @@ function fetchContextMap(string jobIdsFilter) returns map<map<json>>|error {
     return ctxMap;
 }
 
+function fetchCvParsedMap(string jobIdsFilter) returns map<map<json>>|error {
+    string path = string `/rest/v1/cv_parsed_sections?job_id=${jobIdsFilter}&select=candidate_id,raw_text,education,work_experience,projects`;
+    http:Response r = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    map<map<json>> cvMap = {};
+    if r.statusCode < 300 {
+        json[] cvs = <json[]>check r.getJsonPayload();
+        foreach json c in cvs {
+            map<json> cm = <map<json>>c;
+            cvMap[cm["candidate_id"].toString()] = cm;
+        }
+    }
+    return cvMap;
+}
+
+function fetchCheatMap(string jobIdsFilter) returns map<int>|error {
+    // We fetch candidate_id from cheat_events. Ideally we'd join on exam_sessions,
+    // but for now we'll fetch all cheat events and filter in-memory or assume the set is small enough.
+    string path = "/rest/v1/cheat_events?select=candidate_id";
+    http:Response r = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    map<int> cheatMap = {};
+    if r.statusCode < 300 {
+        json[] events = <json[]>check r.getJsonPayload();
+        foreach json e in events {
+            string cId = (<map<json>>e)["candidate_id"].toString();
+            cheatMap[cId] = (cheatMap[cId] ?: 0) + 1;
+        }
+    }
+    return cheatMap;
+}
+
 function assembleCandidateList(json[] profiles, map<string> jobTitleMap,
                                map<map<json>> evalMap, map<string> invMap,
-                               map<map<json>> ctxMap) returns types:CandidateResponse[] {
+                               map<map<json>> ctxMap, map<map<json>> cvMap,
+                               map<int> cheatMap) returns types:CandidateResponse[] {
     types:CandidateResponse[] results = [];
     foreach json p in profiles {
         map<json> pm = <map<json>>p;
@@ -371,6 +427,20 @@ function assembleCandidateList(json[] profiles, map<string> jobTitleMap,
             }
         }
 
+        map<json>? cv = cvMap[cId];
+
+        string? rawText = ();
+        json? edu = ();
+        json? work = ();
+        json? proj = ();
+
+        if cv is map<json> {
+            rawText = cv["raw_text"] is () ? () : cv["raw_text"].toString();
+            edu = cv["education"];
+            work = cv["work_experience"];
+            proj = cv["projects"];
+        }
+
         string rawName = invId != "" && invMap.hasKey(invId) ? invMap.get(invId) : "Unknown Candidate";
         string dispName = status == constants:STATUS_ACCEPTED ? rawName : string `Candidate #${cId.substring(0, 8)}`;
 
@@ -387,7 +457,12 @@ function assembleCandidateList(json[] profiles, map<string> jobTitleMap,
             summaryFeedback: fb,
             experienceLevel: expLevel,
             detectedStack: stack,
-            hfRelevanceSkipped: hfSkipped
+            hfRelevanceSkipped: hfSkipped,
+            cheatEventCount: cheatMap.hasKey(cId) ? cheatMap.get(cId) : 0,
+            cvText: rawText,
+            education: edu,
+            workExperience: work,
+            projects: proj
         });
     }
     return results;
