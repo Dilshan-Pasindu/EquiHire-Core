@@ -32,4 +32,6 @@ export type {
   Candidate,
   CandidateAnswerPayload,
   ValidateInvitationResponse,
+  ParsedCv,
+  UploadCvResponse,
 } from './api';

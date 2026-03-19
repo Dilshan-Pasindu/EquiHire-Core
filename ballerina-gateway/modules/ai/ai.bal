@@ -8,10 +8,11 @@ import avi0ra/huggingface;
 configurable string geminiKey = ?;
 configurable string hfToken = ?;
 
-
-const string GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1/models";
-const string GEMINI_CV_MODEL = "gemini-1.5-flash"; 
-const string GEMINI_EVAL_MODEL = "gemini-1.5-flash";
+// Use the v1beta endpoint with generateContent (Gemini API).
+// Model verified via: curl v1beta/models/gemini-flash-latest:generateContent
+const string GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const string GEMINI_CV_MODEL   = "gemini-flash-latest";
+const string GEMINI_EVAL_MODEL = "gemini-flash-latest";
 final http:Client geminiClient = check new (GEMINI_BASE_URL, {
     timeout: 60.0, // Set timeout to 60 seconds
     retryConfig: {
@@ -25,7 +26,6 @@ final huggingface:Client hfClient = check new ({
 
 // ---------------------------------------------------------------------------
 // Java Interop — Apache PDFBox
-
 // ---------------------------------------------------------------------------
 
 isolated function newFile(handle pathname) returns handle = @java:Constructor {
@@ -72,9 +72,7 @@ public isolated function extractTextFromPdf(byte[] pdfBytes) returns string|erro
 
 
     if result is string {
-        io:println("\n[PDFBOX DEBUG] --- FULL CV CONTENT START ---");
-        io:println(result); 
-        io:println("[PDFBOX DEBUG] --- FULL CV CONTENT END ---\n");
+        log:printInfo(string `PDF extracted — ${result.length()} chars`);
     }
 
     error? closeErr = closeDocument(document);
@@ -103,7 +101,7 @@ isolated function extractTextInternal(handle document) returns string|error {
 
 # Sends a prompt to a Gemini model and returns the first text response.
 #
-# + model - Gemini model ID (e.g. "gemini-1.5-flash")
+# + model - Gemini model ID (e.g. "gemini-1.5-flash-latest")
 # + prompt - The prompt text to send
 # + return - Raw text response from Gemini or an error
 isolated function callGemini(string model, string prompt) returns string|error {
@@ -117,11 +115,21 @@ isolated function callGemini(string model, string prompt) returns string|error {
         ]
     };
 
+    // Use generateContent endpoint (Gemini API, not legacy PaLM generateText)
+    string url = string `/models/${model}:generateContent?key=${geminiKey}`;
 
-    string url = string `/${model}:generateContent?key=${geminiKey}`;
+    log:printInfo(string `Calling Gemini API: ${url}`);
 
     http:Response res = check geminiClient->post(url, payload);
     
+    // Check for HTTP errors
+    if res.statusCode < 200 || res.statusCode >= 300 {
+        log:printError(string `Gemini API returned status ${res.statusCode}`);
+        string body = check res.getTextPayload();
+        log:printError(string `Response body: ${body}`);
+        return error(string `Gemini API error: status ${res.statusCode}`);
+    }
+
     json responsePayload = check res.getJsonPayload();
     map<json> topLevel = <map<json>>responsePayload;
 
@@ -130,18 +138,38 @@ isolated function callGemini(string model, string prompt) returns string|error {
         io:println("Gemini Safety Block: ", topLevel["promptFeedback"].toString());
     }
 
+    // Check for API errors in response
+    if topLevel.hasKey("error") {
+        map<json> errorObj = <map<json>>topLevel["error"];
+        var errorMsgVal = errorObj["message"];
+        string errorMsg = "Unknown error";
+        if errorMsgVal is string && errorMsgVal != "" {
+            errorMsg = errorMsgVal;
+        }
+        log:printError(string `Gemini API error response: ${errorMsg}`);
+        return error(string `Gemini API error: ${errorMsg}`);
+    }
+
     var candidates = topLevel["candidates"];
     if candidates is json[] && candidates.length() > 0 {
         map<json> firstCandidate = <map<json>>candidates[0];
         var content = firstCandidate["content"];
         if content is map<json> {
             json[] parts = <json[]>content["parts"];
-            return (<map<json>>parts[0])["text"].toString();
+            if parts.length() > 0 {
+                var firstPart = parts[0];
+                if firstPart is map<json> {
+                    var textVal = firstPart["text"];
+                    if textVal is string {
+                        return textVal;
+                    }
+                }
+            }
         }
     }
 
     io:println("Gemini Raw Response: ", responsePayload.toString());
-    return error("Gemini returned no content. Check safety filters or quota.");
+    return error("Gemini returned no content. Check safety filters, quota, or API key validity.");
 }
 // ---------------------------------------------------------------------------
 // CV Parsing
@@ -163,7 +191,13 @@ public isolated function parseCvWithGemini(string rawText) returns json|error {
     {
       "experienceLevel": "Junior|Mid-Level|Senior|Lead",
       "detectedStack": ["Skill1", "Skill2"],
-      "piiMap": { "John Doe": "[NAME_1]" },
+      "piiMap": { 
+        "name": "John Doe",
+        "email": "john@example.com",
+        "phone": "+1234567890",
+        "university": "University Name",
+        "address": "City, Country"
+      },
       "sections": { "education": "...", "work_experience": "..." }
     }
 
@@ -173,6 +207,7 @@ public isolated function parseCvWithGemini(string rawText) returns json|error {
 
     string rawResponse = check callGemini(GEMINI_CV_MODEL, prompt);
     
+    log:printInfo(string `Gemini raw response: ${rawResponse}`);
 
     string cleaned = rawResponse.trim();
     
@@ -180,12 +215,23 @@ public isolated function parseCvWithGemini(string rawText) returns json|error {
     if cleaned.startsWith("```") {
         int? firstNewline = cleaned.indexOf("\n");
         int? lastBackticks = cleaned.lastIndexOf("```");
-        if firstNewline is int && lastBackticks is int {
-            cleaned = cleaned.substring(firstNewline, lastBackticks);
+        if firstNewline is int && lastBackticks is int && firstNewline < lastBackticks {
+            cleaned = cleaned.substring(firstNewline + 1, lastBackticks).trim();
         }
     }
     
-    return cleaned.trim().fromJsonString();
+    // Additional cleanup for json code block
+    if cleaned.startsWith("```json") {
+        int? firstNewline = cleaned.indexOf("\n");
+        int? lastBackticks = cleaned.lastIndexOf("```");
+        if firstNewline is int && lastBackticks is int && firstNewline < lastBackticks {
+            cleaned = cleaned.substring(firstNewline + 1, lastBackticks).trim();
+        }
+    }
+    
+    log:printInfo(string `Cleaned response: ${cleaned}`);
+    
+    return cleaned.fromJsonString();
 }
 // ---------------------------------------------------------------------------
 // Answer Relevance Check (HuggingFace)
@@ -241,20 +287,35 @@ public isolated function evaluateAnswerWithGemini(
 ) returns json|error {
     log:printInfo("Evaluating answer with Gemini...");
 
-    string prompt = string `Evaluate the following answer. Return JSON with 'redacted_answer', 'score' (0-10), and 'feedback'.
+    string prompt = string `Evaluate the following answer. Return ONLY a JSON object (no markdown) with 'redacted_answer', 'score' (0-10), and 'feedback'.
     Question: ${question}
     Model Answer: ${modelAnswer}
     Candidate Level: ${experienceLevel}
     Strictness: ${strictness}
     Candidate Answer: ${candidateAnswer}`;
 
-    _ = check callGemini(GEMINI_EVAL_MODEL, prompt);
+    string rawResponse = check callGemini(GEMINI_EVAL_MODEL, prompt);
+    
+    string cleaned = rawResponse.trim();
+    
+    // Clean up markdown code blocks if present
+    if cleaned.startsWith("```") {
+        int? firstNewline = cleaned.indexOf("\n");
+        int? lastBackticks = cleaned.lastIndexOf("```");
+        if firstNewline is int && lastBackticks is int && firstNewline < lastBackticks {
+            cleaned = cleaned.substring(firstNewline + 1, lastBackticks).trim();
+        }
+    }
+    
+    if cleaned.startsWith("```json") {
+        int? firstNewline = cleaned.indexOf("\n");
+        int? lastBackticks = cleaned.lastIndexOf("```");
+        if firstNewline is int && lastBackticks is int && firstNewline < lastBackticks {
+            cleaned = cleaned.substring(firstNewline + 1, lastBackticks).trim();
+        }
+    }
 
-    return {
-        "redacted_answer": candidateAnswer,
-        "score": 8.0,
-        "feedback": "Good answer."
-    };
+    return cleaned.fromJsonString();
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +345,10 @@ public isolated function generateRejectionEmailWithGemini(
 }
 
 # Masks PII values in raw CV text using the piiMap extracted by Gemini.
-
+#
+# + rawText - The raw extracted CV text.
+# + piiMap - Map of PII keys (e.g., email, name, phone) to values.
+# + return - Redacted CV text with PII replaced by placeholders.
 public isolated function maskPii(string rawText, map<json> piiMap) returns string {
     string masked = rawText;
 
@@ -293,7 +357,7 @@ public isolated function maskPii(string rawText, map<json> piiMap) returns strin
     string[] placeholders = ["[CANDIDATE_NAME]", "[EMAIL_REDACTED]", "[PHONE_REDACTED]", "[UNIVERSITY_REDACTED]", "[ADDRESS_REDACTED]"];
 
     foreach int i in 0 ..< keys.length() {
-        json val = piiMap[keys[i]];
+        var val = piiMap[keys[i]];
         if val is string && val != "" {
             masked = replaceAll(masked, val, placeholders[i]);
         }

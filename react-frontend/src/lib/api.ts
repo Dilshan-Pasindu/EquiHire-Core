@@ -18,6 +18,7 @@ import type {
   CreateInvitationPayload,
   CreateEvaluationTemplatePayload,
   CandidateAnswerPayload,
+  UploadCvResponse,
 } from '@/types';
 
 /** Re-export types for consumers that still import from lib/api. */
@@ -209,7 +210,7 @@ export async function getInvitations(userId: string): Promise<Invitation[]> {
 /**
  * Uploads a CV file for a candidate (multipart/form-data).
  */
-export async function uploadCv(formData: FormData): Promise<{ candidateId: string }> {
+export async function uploadCv(formData: FormData): Promise<UploadCvResponse> {
   const response = await fetch(`${API_BASE_URL}/candidates/upload-cv`, {
     method: 'POST',
     body: formData,

@@ -5,9 +5,11 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, ArrowRight, ShieldCheck } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Upload, FileText, CheckCircle, ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
 import { EquiHireLogo } from "@/components/ui/Icons";
 import { API } from "@/lib/api";
+import type { ParsedCv } from '@/types';
 
 interface CandidateData {
     email: string;
@@ -20,7 +22,11 @@ interface CandidateData {
 export default function CandidateWelcome() {
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadStep, setUploadStep] = useState<string>('');
     const [uploadComplete, setUploadComplete] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [parsedCv, setParsedCv] = useState<ParsedCv | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
     const [candidateData, setCandidateData] = useState<CandidateData | null>(null);
 
     useEffect(() => {
@@ -34,29 +40,58 @@ export default function CandidateWelcome() {
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
+
+            // Guard: only accept PDFs
+            if (selectedFile.type !== 'application/pdf') {
+                setUploadError('Only PDF files are accepted. Please upload a valid PDF.');
+                return;
+            }
+
             setFile(selectedFile);
+            setUploadError(null);
             setIsUploading(true);
 
             try {
                 if (!candidateData?.jobId) {
-                     throw new Error('Missing Job ID. Please re-open the invitation link.');
+                    throw new Error('Missing Job ID. Please re-open the invitation link.');
                 }
 
-                // Append the multipart properties required by the Ballerina backend
+                // The backend pipeline is: extract text → upload to R2 → parse with Gemini.
+                // We show step labels so the candidate knows what is happening.
+                setUploadStep('Extracting text from your CV…');
+
                 const formData = new FormData();
-                formData.append("file", selectedFile);
-                formData.append("jobId", candidateData.jobId);
+                formData.append('file', selectedFile);
+                formData.append('jobId', candidateData.jobId);
+
+                // Small delay so the first label is visible before the network request begins
+                await new Promise(r => setTimeout(r, 300));
+                setUploadStep('Uploading to secure storage…');
 
                 const response = await API.uploadCv(formData);
 
-                setUploadComplete(true);
-                // Store candidate ID for interview session
+                setUploadStep('AI analysis complete.');
+
+                // Store candidate ID for the interview session
                 sessionStorage.setItem('candidateId', response.candidateId);
 
+                // Log R2 key for debugging (not shown to candidate)
+                if (response.r2Key) {
+                    console.info('[EquiHire] CV stored in R2:', response.r2Key);
+                }
+
+                setUploadComplete(true);
+                setParsedCv(response.parsed ?? null);
+                if (response.parsed) {
+                    setPreviewOpen(true);
+                }
+
             } catch (err) {
-                console.error("Upload error:", err);
-                // Mock success is disabled, user must upload successfully
-                alert("Failed to upload CV. Please ensure you are uploading a valid PDF.");
+                const message = err instanceof Error ? err.message : 'Unknown upload error';
+                console.error('[EquiHire] CV upload failed:', message);
+                setUploadError('Upload failed — ' + message + '. Please try again with a valid PDF.');
+                setFile(null);
+                setUploadStep('');
             } finally {
                 setIsUploading(false);
             }
@@ -109,33 +144,62 @@ export default function CandidateWelcome() {
                                 </h3>
 
                                 {!uploadComplete ? (
-                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors relative">
-                                        <Input
-                                            type="file"
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            onChange={handleFileChange}
-                                            accept=".pdf,.docx"
-                                        />
-                                        <div className="flex flex-col items-center justify-center pointer-events-none">
-                                            <Upload className={`h-10 w-10 text-gray-400 mb-3 ${isUploading ? 'animate-bounce' : ''}`} />
-                                            <p className="text-sm font-medium text-gray-900">
-                                                {isUploading ? "Uploading..." : "Click to upload or drag and drop"}
-                                            </p>
-                                            <p className="text-xs text-gray-500 mt-1">PDF or DOCX up to 10MB</p>
+                                    <>
+                                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors relative">
+                                            <Input
+                                                type="file"
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                onChange={handleFileChange}
+                                                accept=".pdf"
+                                                disabled={isUploading}
+                                            />
+                                            <div className="flex flex-col items-center justify-center pointer-events-none">
+                                                <Upload className={`h-10 w-10 text-gray-400 mb-3 ${isUploading ? 'animate-bounce' : ''}`} />
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {isUploading
+                                                        ? uploadStep || 'Uploading…'
+                                                        : 'Click to upload or drag and drop'}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">PDF only · up to 10 MB</p>
+                                            </div>
                                         </div>
-                                    </div>
+
+                                        {/* Inline error message — no alert() */}
+                                        {uploadError && (
+                                            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                                <span>{uploadError}</span>
+                                            </div>
+                                        )}
+                                    </>
                                 ) : (
-                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
-                                        <div className="flex items-center">
-                                            <div className="bg-green-100 p-2 rounded-full mr-3">
-                                                <FileText className="h-5 w-5 text-green-700" />
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-center">
+                                                <div className="bg-green-100 p-2 rounded-full mr-3">
+                                                    <FileText className="h-5 w-5 text-green-700" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-green-800">{file?.name ?? 'Your CV file'}</p>
+                                                    <p className="text-xs text-green-600">Upload complete — We parsed your information.</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-green-800">{file?.name}</p>
-                                                <p className="text-xs text-green-600">Upload complete</p>
-                                            </div>
+                                            <CheckCircle className="h-5 w-5 text-green-600" />
                                         </div>
-                                        <CheckCircle className="h-5 w-5 text-green-600" />
+
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                            <Button
+                                                variant="outline"
+                                                className="w-full sm:w-auto"
+                                                onClick={() => setPreviewOpen(true)}
+                                                disabled={!parsedCv}
+                                            >
+                                                View extracted info
+                                            </Button>
+                                            <p className="text-xs text-gray-500">
+                                                If it looks off, you can re-upload a clearer version.
+                                            </p>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -158,6 +222,77 @@ export default function CandidateWelcome() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Extracted CV preview</DialogTitle>
+                                <DialogDescription>
+                                    We parsed the key information from your upload. This helps us match you to the role while keeping your identity private.
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto text-sm text-gray-700">
+                                {parsedCv ? (
+                                    <>
+                                        {parsedCv.experienceLevel && (
+                                            <div>
+                                                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Experience Level</h4>
+                                                <p className="mt-1 text-base font-medium text-gray-900">
+                                                    {parsedCv.experienceLevel}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {parsedCv.detectedStack && parsedCv.detectedStack.length > 0 && (
+                                            <div>
+                                                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Detected Skills</h4>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {parsedCv.detectedStack.map((skill: string) => (
+                                                        <span
+                                                            key={skill}
+                                                            className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium"
+                                                        >
+                                                            {skill}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {parsedCv.sections && Object.keys(parsedCv.sections).length > 0 ? (
+                                            <div className="space-y-4">
+                                                {Object.entries(parsedCv.sections).map(([section, value]) => {
+                                                    const normalizedTitle = section
+                                                        .replace(/_/g, ' ')
+                                                        .replace(/\b\w/g, (c) => c.toUpperCase());
+                                                    const content = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+                                                    return (
+                                                        <div key={section} className="space-y-1">
+                                                            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                                {normalizedTitle}
+                                                            </h4>
+                                                            <p className="text-sm text-gray-700 whitespace-pre-line">{content}</p>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-500">No section breakdowns were found in the parsed CV.</p>
+                                        )}
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-gray-500">No parsed preview is available yet. Upload a clearer CV and try again.</p>
+                                )}
+                            </div>
+
+                            <DialogFooter>
+                                <Button className="w-full sm:w-auto" onClick={() => setPreviewOpen(false)}>
+                                    Close
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
                     <p className="text-center text-xs text-gray-400">
                         Powered by EquiHire Core • Privacy Protected

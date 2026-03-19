@@ -250,76 +250,78 @@ service /api on apiListener {
         }
 
 
+        // --- Validation ---
         if fileBytes is () || jobId is () {
             return <http:BadRequest>{
-                body: {"error": "Missing 'file' or 'jobId'"}
+                body: {"error": "Missing 'file' or 'jobId' in multipart request"}
             };
         }
 
         string candidateId = uuid:createType1AsString();
-        io:println("Processing Candidate: ", candidateId);
+        io:println("[CV Upload] Processing candidate: ", candidateId);
 
-        // Pass bytes directly to Apache PDFBox 
-
+        // ---------------------------------------------------------------
+        // Step 1: Extract text from PDF using Apache PDFBox
+        // ---------------------------------------------------------------
         string|error rawText = ai:extractTextFromPdf(fileBytes);
-        
         if rawText is error {
-             io:println("PDFBox Extraction Failed: ", rawText.message());
-             return <http:InternalServerError>{ body: {"error": "Could not read PDF content"}};
+            io:println("[CV Upload] FAIL — PDFBox extraction error: ", rawText.message());
+            return <http:InternalServerError>{body: {"error": "Could not read PDF content"}};
         }
-        io:println("PDF text extracted successfully.");
+        io:println("[CV Upload] PDF text extracted successfully.");
 
-        // Pass extracted text to Google Gemini
+        // ---------------------------------------------------------------
+        // Step 2: Upload raw PDF to Cloudflare R2 for secure storage
+        // ---------------------------------------------------------------
+        string r2ObjectKey = string `cvs/${candidateId}.pdf`;
+        error? r2Err = uploadBytesToR2(r2, fileBytes, r2ObjectKey, r2HttpClient);
+        if r2Err is error {
+            // Non-fatal: log and continue — parsing should not be blocked by storage
+            io:println("[CV Upload] WARN — R2 upload failed: ", r2Err.message());
+        } else {
+            io:println("[CV Upload] CV stored in R2: ", r2ObjectKey);
+        }
 
+        // ---------------------------------------------------------------
+        // Step 3: Parse extracted CV text with Google Gemini
+        // ---------------------------------------------------------------
         json|error cvJson = ai:parseCvWithGemini(rawText);
-        
         if cvJson is error {
-             io:println("Gemini Parsing Failed: ", cvJson.message());
-             return <http:InternalServerError>{ body: {"error": "AI could not parse the CV"}};
+            io:println("[CV Upload] FAIL — Gemini parse error: ", cvJson.message());
+            return <http:InternalServerError>{body: {"error": "AI could not parse the CV"}};
         }
-        io:println("Gemini analysis complete.");
+        io:println("[CV Upload] Gemini analysis complete.");
 
-        // Mask PII in the raw text using the piiMap from Gemini
-        string redactedText = rawText;
+        // ---------------------------------------------------------------
+        // Step 4: Mask PII in raw text using the piiMap from Gemini
+        // ---------------------------------------------------------------
         map<json> cvMap = <map<json>>cvJson;
+        string redactedText = rawText;
         var piiMapVal = cvMap["piiMap"];
         if piiMapVal is map<json> {
             redactedText = ai:maskPii(rawText, piiMapVal);
-            io:println("PII Masking complete. Redacted preview: ", redactedText.substring(0, 200));
+            io:println("[CV Upload] PII masking complete.");
         } else {
-            io:println("No PII map found in Gemini response, skipping masking.");
+            io:println("[CV Upload] No piiMap from Gemini — skipping masking.");
         }
 
-        // Save results to Supabase
-    var saveToDatabase = function(json parsedData, string cId, string jId, string redacted) returns error? { 
+        // ---------------------------------------------------------------
+        // Step 5: Persist parsed CV sections to Supabase (async)
+        // ---------------------------------------------------------------
+        _ = start saveCvToDatabase(dbClient, cvJson, candidateId, jobId, redactedText);
 
-        map<json> dataMap = <map<json>>parsedData;
-        map<json> sections = <map<json>>dataMap["sections"];
+        // Return a sanitized preview — never return raw PII to the frontend
+        map<json> safeParsed = {};
+        if cvMap.hasKey("experienceLevel") { safeParsed["experienceLevel"] = cvMap["experienceLevel"]; }
+        if cvMap.hasKey("detectedStack")   { safeParsed["detectedStack"]   = cvMap["detectedStack"]; }
+        if cvMap.hasKey("sections")        { safeParsed["sections"]        = cvMap["sections"]; }
 
-
-       json education = sections.get("education");
-       json workExperience = sections.get("work_experience");
-       json projects = sections.get("projects");
-       json technicalSkills = dataMap.get("detectedStack"); 
-
-
-        check dbClient->insertCvParsedSections(
-           cId, 
-           jId, 
-           redacted, 
-           education, 
-           workExperience, 
-           projects, 
-           technicalSkills
-        );
-
-        io:println("Successfully saved Candidate data to public.cv_parsed_sections");
-        return;
-    };
-        _ = start saveToDatabase(cvJson, candidateId, jobId, redactedText);
-
-
-        return {"status": "success", "candidateId": candidateId};
+        return {
+            "status":      "success",
+            "candidateId": candidateId,
+            "r2Key":       r2ObjectKey,
+            "parsed":      safeParsed
+        };
     }
 
     // 3. Reveal Candidate (Get Secure Link from Python Vault)
@@ -738,4 +740,45 @@ service /api on apiListener {
 
         return {"status": "flagged", "candidateId": candidateId};
     }
+}
+
+// ===========================================================================
+// CV Upload — Database Persistence Helper
+// ===========================================================================
+
+# Persists parsed CV sections from Gemini into the cv_parsed_sections table.
+# Called asynchronously (fire-and-forget) to not block the HTTP response.
+#
+# + db          - Repository client
+# + parsedData  - Full Gemini JSON output
+# + candidateId - Candidate UUID
+# + jobId       - Job ID this application is for
+# + redacted    - PII-masked raw text
+# + return      - error if Supabase insert fails, otherwise ()
+function saveCvToDatabase(
+    database:Repository db,
+    json parsedData,
+    string candidateId,
+    string jobId,
+    string redacted
+) returns error? {
+    map<json> dataMap = <map<json>>parsedData;
+    map<json> sections = dataMap.hasKey("sections") ? <map<json>>dataMap["sections"] : {};
+
+    json education       = sections.hasKey("education")       ? sections["education"]       : "";
+    json workExperience  = sections.hasKey("work_experience") ? sections["work_experience"] : "";
+    json projects        = sections.hasKey("projects")        ? sections["projects"]        : "";
+    json technicalSkills = dataMap.hasKey("detectedStack")    ? dataMap["detectedStack"]    : [];
+
+    check db->insertCvParsedSections(
+        candidateId,
+        jobId,
+        redacted,
+        education,
+        workExperience,
+        projects,
+        technicalSkills
+    );
+
+    io:println("[CV Upload] Supabase — cv_parsed_sections saved for candidate: ", candidateId);
 }
