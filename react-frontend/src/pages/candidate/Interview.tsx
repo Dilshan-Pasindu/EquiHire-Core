@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { API } from "@/lib/api";
 import {
     Loader2, AlertCircle, ShieldAlert, 
-    Terminal, CheckCircle
+    Terminal, CheckCircle, Clock
 } from "lucide-react";
 import type { CheatEventItem, AnswerSubmission, SubmitAssessmentPayload, Question } from '@/types';
 
@@ -56,8 +56,12 @@ export default function CandidateInterview() {
     }, [flashWarning]);
 
     // Initialize session and questions
+    const isInitializing = useRef(false);
+
     useEffect(() => {
         const initializeInterview = async () => {
+            if (isInitializing.current) return;
+            isInitializing.current = true;
             try {
                 const candidateIdStr = sessionStorage.getItem('candidateId');
                 const candidateDataStr = sessionStorage.getItem('candidateData');
@@ -300,36 +304,37 @@ export default function CandidateInterview() {
             )}
 
             {/* Header */}
-            <header className="h-16 flex items-center justify-between px-6 lg:px-12 bg-white border-b border-gray-200 z-50">
-                <div className="flex items-center gap-3">
-                    <div className="bg-blue-600 p-1.5 rounded-lg shadow-sm">
-                        <EquiHireLogo className="h-6 w-auto text-white" />
-                    </div>
-                    <span className="font-bold text-xl tracking-tight text-gray-900">EquiHire</span>
-                    <div className="h-4 w-px bg-gray-200 mx-2" />
-                    <span className="text-sm font-medium text-gray-500 uppercase tracking-widest">Assessment</span>
+            <header className="h-20 flex items-center justify-between px-8 lg:px-12 bg-white border-b border-gray-100 z-50 shadow-sm sticky top-0">
+                <div className="flex items-center gap-4">
+                    <EquiHireLogo className="h-8 w-auto text-blue-600" />
+                    <span className="font-extrabold text-xl tracking-tight text-gray-900">EquiHire</span>
+                    <div className="h-5 w-px bg-gray-200 mx-1" />
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest border border-gray-100 bg-gray-50 px-2.5 py-1 rounded-md">Live Assessment</span>
                 </div>
                 
                 <div className="flex items-center gap-6">
-                    <div className="flex flex-col items-end">
-                        <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Time Remaining</span>
-                        <span className={`font-mono text-xl font-bold ${timeLeft < 300 ? 'text-red-500' : 'text-blue-600'}`}>
-                            {formatTime(timeLeft)}
-                        </span>
+                    <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl">
+                        <Clock className={`w-5 h-5 ${timeLeft < 300 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
+                        <div className="flex flex-col justify-center">
+                            <span className="text-[10px] uppercase font-extrabold text-gray-400 tracking-widest leading-none mb-1">Time Remaining</span>
+                            <span className={`font-mono text-lg font-black leading-none ${timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-gray-900'}`}>
+                                {formatTime(timeLeft)}
+                            </span>
+                        </div>
                     </div>
                     <Button 
                         onClick={handleSubmitClick}
-                        className="bg-gray-900 hover:bg-black text-white px-6 font-bold"
+                        className="bg-[#FF7300] hover:bg-[#E56700] text-white px-8 h-11 rounded-lg font-bold shadow-md hover:shadow-lg transition-all"
                     >
-                        Submit
+                        Finish & Submit
                     </Button>
                 </div>
             </header>
 
             <div className="flex-1 flex overflow-hidden">
                 {/* Question Navigation Sidebar */}
-                <aside className="w-72 bg-white border-r border-gray-200 flex flex-col p-6 overflow-y-auto">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Question Navigation</h3>
+                <aside className="w-[300px] bg-white border-r border-gray-100 flex flex-col pt-8 pb-6 px-6 overflow-y-auto shadow-[2px_0_8px_rgba(0,0,0,0.02)] z-10">
+                    <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-6 border-b border-gray-100 pb-2">Progress map</h3>
                     <div className="grid grid-cols-4 gap-3">
                         {questions.map((q, idx) => {
                             const isCurrent = idx === currentQuestionIndex;
@@ -339,82 +344,95 @@ export default function CandidateInterview() {
                                     key={q.id}
                                     onClick={() => setCurrentQuestionIndex(idx)}
                                     className={`
-                                        w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-200
-                                        ${isCurrent ? 'bg-blue-600 text-white shadow-lg ring-2 ring-blue-100' : 
-                                          isAnswered ? 'bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100' : 
-                                          'bg-gray-100 text-gray-400 hover:bg-gray-200'}
+                                        relative w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all duration-300
+                                        ${isCurrent ? 'bg-black text-white shadow-md ring-4 ring-gray-200 scale-105' : 
+                                          isAnswered ? 'bg-[#FFF3EB] text-[#FF7300] border border-[#FFD5B8] hover:bg-[#FFE5D1]' : 
+                                          'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 hover:border-gray-300'}
                                     `}
                                 >
                                     {idx + 1}
+                                    {isAnswered && !isCurrent && (
+                                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white" />
+                                    )}
                                 </button>
                             );
                         })}
                     </div>
 
                     <div className="mt-auto pt-8 border-t border-gray-100">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-3 h-3 rounded bg-blue-600" />
-                            <span className="text-xs font-medium text-gray-600">Current Question</span>
-                        </div>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-3 h-3 rounded bg-blue-50 border border-blue-100" />
-                            <span className="text-xs font-medium text-gray-600">Answered</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded bg-gray-100" />
-                            <span className="text-xs font-medium text-gray-600">Unanswered</span>
+                        <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-100">
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded bg-black ring-2 ring-gray-200" />
+                                <span className="text-xs font-bold text-gray-700">Current</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded bg-[#FF7300] ring-2 ring-[#FFD5B8]" />
+                                <span className="text-xs font-bold text-gray-700">Answered</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded bg-gray-200" />
+                                <span className="text-xs font-bold text-gray-700">Unanswered</span>
+                            </div>
                         </div>
                     </div>
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-12 bg-gray-50">
-                    <div className="max-w-4xl mx-auto space-y-8">
+                <main className="flex-1 overflow-y-auto p-10 lg:p-14 bg-gray-50/50">
+                    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {/* Question View */}
-                        <div className="bg-white rounded-3xl p-10 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
-                            <div className="flex items-center gap-3 mb-6">
-                                <span className="bg-blue-50 text-blue-600 font-bold px-3 py-1 rounded-lg text-xs uppercase tracking-wider">
-                                    Question {currentQuestionIndex + 1}
-                                </span>
-                                {isCodeQuestion && (
-                                    <span className="bg-amber-50 text-amber-600 font-bold px-3 py-1 rounded-lg text-xs uppercase tracking-wider flex items-center gap-1.5">
-                                        <Terminal className="w-3.5 h-3.5" />
-                                        Coding
+                        <div className="bg-white rounded-2xl p-8 lg:p-10 shadow-sm border border-gray-200 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-1.5 h-full bg-[#FF7300]" />
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <span className="bg-gray-100 text-gray-900 font-extrabold px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-widest border border-gray-200">
+                                        Question {currentQuestionIndex + 1} of {questions.length}
                                     </span>
-                                )}
+                                    {isCodeQuestion && (
+                                        <span className="bg-[#FFF3EB] text-[#FF7300] font-extrabold px-3 py-1.5 rounded-lg text-[11px] uppercase tracking-widest flex items-center gap-1.5 border border-[#FFD5B8]">
+                                            <Terminal className="w-3.5 h-3.5" />
+                                            Coding Required
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="text-xs font-medium text-gray-400">
+                                    {answers[currentQuestion?.id] ? 'Answer recorded safely' : 'Not answered yet'}
+                                </span>
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900 leading-tight">
+                            <h2 className="text-2xl font-bold text-gray-900 leading-relaxed">
                                 {currentQuestion?.questionText}
                             </h2>
                         </div>
 
                         {/* Answer Input Area */}
-                        <div className="space-y-4">
-                            <label className="text-[10px] uppercase font-bold text-gray-400 tracking-widest pl-1">Your Solution</label>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center px-1">
+                                <label className="text-[11px] font-extrabold text-gray-500 uppercase tracking-widest">Your Solution</label>
+                            </div>
                             {isCodeQuestion ? (
-                                <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-900">
-                                    <div className="bg-gray-800 px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
+                                <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-[#1e1e1e] ring-1 ring-gray-900/5">
+                                    <div className="bg-[#2d2d2d] px-4 py-3 border-b border-[#404040] flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
                                             <div className="flex gap-1.5">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                                                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
-                                                <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
+                                                <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+                                                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+                                                <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
                                             </div>
-                                            <span className="ml-3 text-[10px] font-mono text-gray-400">solution.py</span>
+                                            <div className="h-4 w-px bg-gray-600 mx-1"></div>
+                                            <span className="text-xs font-mono font-medium text-gray-300">solution.ts</span>
                                         </div>
                                     </div>
                                     <div className="flex min-h-[400px]">
-                                        <div className="bg-gray-800/30 px-4 py-4 text-right select-none pointer-events-none border-r border-gray-800 min-w-[50px]">
+                                        <div className="bg-[#1e1e1e] px-4 py-5 text-right select-none pointer-events-none border-r border-[#333] min-w-[40px]">
                                             {getLineNumbers(currentAnswer).map(num => (
-                                                <div key={num} className="text-gray-600 text-xs font-mono leading-7">
+                                                <div key={num} className="text-[#858585] text-[14px] font-mono leading-[26px]">
                                                     {num}
                                                 </div>
                                             ))}
                                         </div>
                                         <textarea
-                                            className="flex-1 bg-transparent text-blue-400 font-mono text-sm p-4 resize-none border-0 outline-none focus:ring-0 leading-7 placeholder:text-gray-600 w-full"
-                                            placeholder="# Write your secure solution here..."
+                                            className="flex-1 bg-[#1e1e1e] text-[#d4d4d4] font-mono text-[14px] p-5 resize-none border-0 outline-none focus:ring-0 leading-[26px] placeholder:text-[#6b6b6b] w-full"
+                                            placeholder="// Write your secure solution here..."
                                             value={currentAnswer}
                                             onChange={(e) => handleAnswerChange(e.target.value)}
                                             spellCheck={false}
@@ -422,22 +440,27 @@ export default function CandidateInterview() {
                                     </div>
                                 </div>
                             ) : (
-                                <Textarea
-                                    placeholder="Provide your comprehensive answer here..."
-                                    className="min-h-[400px] bg-white border-gray-200 text-gray-900 text-lg p-8 rounded-3xl shadow-sm focus-visible:ring-blue-600 transition-all duration-300 resize-none"
-                                    value={currentAnswer}
-                                    onChange={(e) => handleAnswerChange(e.target.value)}
-                                />
+                                <div className="relative group">
+                                    <Textarea
+                                        placeholder="Provide your comprehensive answer here... Formatting is preserved."
+                                        className="min-h-[400px] bg-white border border-gray-200 text-gray-900 text-base leading-relaxed p-8 rounded-2xl shadow-sm hover:border-[#FF7300]/50 focus-visible:ring-4 focus-visible:ring-[#FF7300]/10 focus-visible:border-[#FF7300] transition-all duration-300 resize-none font-medium"
+                                        value={currentAnswer}
+                                        onChange={(e) => handleAnswerChange(e.target.value)}
+                                    />
+                                    <div className="absolute bottom-4 right-6 text-xs font-bold text-gray-300 pointer-events-none group-focus-within:text-blue-300 transition-colors">
+                                        {currentAnswer.length} chars
+                                    </div>
+                                </div>
                             )}
                         </div>
 
                         {/* Footer Controls */}
-                        <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                        <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mt-8">
                             <Button
-                                variant="ghost"
+                                variant="outline"
                                 onClick={handlePrev}
                                 disabled={currentQuestionIndex === 0}
-                                className="text-gray-500 font-bold hover:bg-gray-100 px-8 h-12"
+                                className="text-gray-600 font-bold border-gray-200 hover:bg-gray-50 hover:text-gray-900 px-8 h-12 rounded-xl transition-all"
                             >
                                 Previous
                             </Button>
@@ -446,18 +469,9 @@ export default function CandidateInterview() {
                                 {!isLastQuestion && (
                                     <Button
                                         onClick={handleNext}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 h-12 shadow-md"
+                                        className="bg-black hover:bg-gray-900 text-white font-bold px-10 h-12 rounded-xl shadow-md hover:shadow-lg transition-all"
                                     >
                                         Next Question
-                                    </Button>
-                                )}
-                                {isLastQuestion && (
-                                    <Button
-                                        onClick={handleSubmitClick}
-                                        disabled={isSubmitted || Object.keys(answers).length === 0}
-                                        className="bg-gray-900 hover:bg-black text-white font-bold px-10 h-12 shadow-lg"
-                                    >
-                                        Submit Assessment
                                     </Button>
                                 )}
                             </div>

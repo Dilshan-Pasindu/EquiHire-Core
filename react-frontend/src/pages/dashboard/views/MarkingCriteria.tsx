@@ -36,11 +36,24 @@ export default function MarkingCriteria() {
   const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [cvWeight, setCvWeight] = useState(30);
+  const [skillsWeight, setSkillsWeight] = useState(40);
+  const [interviewWeight, setInterviewWeight] = useState(30);
 
   const handleOpenDialog = (template?: ExtendedEvaluationTemplate) => {
     if (template) {
       setIsEditing(true);
       setCurrentTemplate(template);
+      
+      const promptTemplate = template.prompt_template || '';
+      const cvMatch = promptTemplate.match(/CV_MATCH=(\d+)/);
+      const skillMatch = promptTemplate.match(/SKILL_MATCH=(\d+)/);
+      const intMatch = promptTemplate.match(/TECHNICAL_INTERVIEW=(\d+)/);
+      
+      setCvWeight(cvMatch ? parseInt(cvMatch[1], 10) : 30);
+      setSkillsWeight(skillMatch ? parseInt(skillMatch[1], 10) : 40);
+      setInterviewWeight(intMatch ? parseInt(intMatch[1], 10) : 30);
     } else {
       setIsEditing(false);
       setCurrentTemplate({
@@ -50,6 +63,9 @@ export default function MarkingCriteria() {
         prompt_template: '',
         is_system_template: false,
       });
+      setCvWeight(30);
+      setSkillsWeight(40);
+      setInterviewWeight(30);
     }
     setIsOpen(true);
   };
@@ -58,11 +74,18 @@ export default function MarkingCriteria() {
     if (!orgId) return;
     setIsSaving(true);
     try {
+      let finalPrompt = currentTemplate.prompt_template ?? '';
+      
+      finalPrompt = finalPrompt.replace(/\n*Scoring Weights:\nCV_MATCH=\d+\nSKILL_MATCH=\d+\nTECHNICAL_INTERVIEW=\d+/, '');
+      finalPrompt = finalPrompt.trim();
+      
+      finalPrompt += `\n\nScoring Weights:\nCV_MATCH=${cvWeight}\nSKILL_MATCH=${skillsWeight}\nTECHNICAL_INTERVIEW=${interviewWeight}`;
+
       const payload = {
         name: currentTemplate.name ?? '',
         description: currentTemplate.description ?? '',
         type: currentTemplate.type ?? 'QUESTIONNAIRE',
-        prompt_template: currentTemplate.prompt_template ?? '',
+        prompt_template: finalPrompt,
         criteria: currentTemplate.criteria ?? [],
       };
       if (isEditing && currentTemplate.id) {
@@ -226,21 +249,41 @@ export default function MarkingCriteria() {
               />
             </div>
             <div className="grid gap-2">
+              <label className="text-sm font-medium">Evaluation Weights</label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                    <span className="text-xs text-gray-500 block mb-1">CV Match (%)</span>
+                    <Input type="number" min={0} max={100} value={cvWeight} onChange={e => setCvWeight(Number(e.target.value))} />
+                </div>
+                <div className="flex-1">
+                    <span className="text-xs text-gray-500 block mb-1">Skills (%)</span>
+                    <Input type="number" min={0} max={100} value={skillsWeight} onChange={e => setSkillsWeight(Number(e.target.value))} />
+                </div>
+                <div className="flex-1">
+                    <span className="text-xs text-gray-500 block mb-1">Interview (%)</span>
+                    <Input type="number" min={0} max={100} value={interviewWeight} onChange={e => setInterviewWeight(Number(e.target.value))} />
+                </div>
+              </div>
+              <p className={`text-xs font-medium ${cvWeight + skillsWeight + interviewWeight === 100 ? 'text-gray-400' : 'text-red-500'}`}>
+                Total must be 100%. (Current: {cvWeight + skillsWeight + interviewWeight}%)
+              </p>
+            </div>
+            <div className="grid gap-2">
               <label className="text-sm font-medium">AI Prompt Instructions</label>
               <Textarea
-                value={currentTemplate.prompt_template ?? ''}
+                value={(currentTemplate.prompt_template ?? '').replace(/\n*Scoring Weights:\nCV_MATCH=\d+\nSKILL_MATCH=\d+\nTECHNICAL_INTERVIEW=\d+/, '').trim()}
                 onChange={(e) => setCurrentTemplate((t) => ({ ...t, prompt_template: e.target.value }))}
                 placeholder="You are an expert technical interviewer evaluating a candidate for..."
                 className="h-32 font-mono text-sm"
               />
-              <p className="text-xs text-gray-500">Provide specific weights and logic for the AI engine to evaluate answers.</p>
+              <p className="text-xs text-gray-500">Provide specific prompt logic for the AI engine to evaluate answers.</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={handleSave} disabled={isSaving}>
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={handleSave} disabled={isSaving || (cvWeight + skillsWeight + interviewWeight !== 100)}>
               {isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Template'}
             </Button>
           </DialogFooter>

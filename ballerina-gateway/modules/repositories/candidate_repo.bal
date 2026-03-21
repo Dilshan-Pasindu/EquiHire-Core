@@ -90,11 +90,13 @@ public function getRecruiterId(string userId) returns string|error {
 
 public function insertCvParsedSections(string candidateId, string jobId, string rawText,
                                        json education, json workExperience, json projects,
+                                       json achievements, json certificates,
                                        json technicalSkills) returns error? {
     json payload = {
         "candidate_id": candidateId, "job_id": jobId, "raw_text": rawText,
         "education": education, "work_experience": workExperience,
-        "projects": projects, "technical_skills": technicalSkills, "parser_version": "v2.0"
+        "projects": projects, "achievements": achievements, "certificates": certificates, 
+        "technical_skills": technicalSkills, "parser_version": "v2.0"
     };
     http:Response response = check clients:supabaseHttpClient->post(
         "/rest/v1/cv_parsed_sections", payload, headers = clients:getSupabaseServiceHeaders());

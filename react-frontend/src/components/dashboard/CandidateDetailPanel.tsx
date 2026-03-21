@@ -75,7 +75,7 @@ export function CandidateDetailPanel({
           {/* Overall AI Match score */}
           <section className="p-4 bg-gray-50 rounded-lg border border-gray-100" aria-labelledby="score-heading">
             <div className="flex justify-between items-center mb-2">
-              <span id="score-heading" className="text-xs font-semibold uppercase text-gray-500">Overall AI Match</span>
+              <span id="score-heading" className="text-xs font-semibold uppercase text-gray-500">Overall AI Match (Weighted)</span>
               {candidate.score > 0 && (
                 <span className="font-bold text-lg text-gray-900">{candidate.score}%</span>
               )}

@@ -38,6 +38,12 @@ export default function CandidateManager() {
     activityFilter,
     setActivityFilter,
     setThreshold,
+    cvWeight,
+    setCvWeight,
+    skillsWeight,
+    setSkillsWeight,
+    interviewWeight,
+    setInterviewWeight,
     setSelectedCandidate,
     handleViewDetails,
     handleApplyDecision,
@@ -89,6 +95,12 @@ export default function CandidateManager() {
             onActivityChange={setActivityFilter}
             threshold={threshold}
             onThresholdChange={setThreshold}
+            cvWeight={cvWeight}
+            onCvWeightChange={setCvWeight}
+            skillsWeight={skillsWeight}
+            onSkillsWeightChange={setSkillsWeight}
+            interviewWeight={interviewWeight}
+            onInterviewWeightChange={setInterviewWeight}
           />
         </div>
 

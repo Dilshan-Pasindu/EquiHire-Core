@@ -12,6 +12,17 @@ import equihire/gateway.constants;
 
 public function createExamSession(string candidateId, string invitationId,
                                   string jobId) returns string|error {
+    
+    // Check for an existing active session
+    string checkPath = string `/rest/v1/exam_sessions?candidate_id=eq.${candidateId}&job_id=eq.${jobId}&select=id&order=created_at.desc&limit=1`;
+    http:Response checkResp = check clients:supabaseHttpClient->get(
+        checkPath, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    if checkResp.statusCode < 300 {
+        json[] existing = <json[]>check checkResp.getJsonPayload();
+        if existing.length() > 0 {
+            return (<map<json>>existing[0])["id"].toString();
+        }
+    }
     json payload = {
         "candidate_id":   candidateId,
         "invitation_id":  invitationId,

@@ -178,14 +178,6 @@ function summarizeViolations(types:CheatEventItem[] events) returns string {
 function buildGradingResult(string sessionId, string candidateId, string questionId,
                              string redactedAns, types:QuestionItem q, string expLevel,
                              boolean hfPassed, float? hfScore, string violationsSummary) returns types:GradingResult {
-    if !hfPassed {
-        return {
-            sessionId: sessionId, candidateId: candidateId, questionId: questionId,
-            redactedAnswer: redactedAns, score: constants:AUTO_ZERO_SCORE,
-            feedback: constants:AUTO_ZERO_FEEDBACK, hfGatePassed: false,
-            hfRelevanceScore: hfScore, wasFlagged: false
-        };
-    }
     return callGeminiGrader(sessionId, candidateId, questionId, redactedAns, q, expLevel, hfScore, violationsSummary);
 }
 
@@ -302,11 +294,9 @@ function aggregateAndFinalize(string candidateId, string jobId,
         
         if existingEval is error {
             log:printWarn("Could not fetch existing evaluation scores", candidateId = candidateId, errorMessage = existingEval.message());
-        } else if existingEval is json {
-            
-            map<json> evalMap = <map<json>>existingEval;
-            cvScore = <float>(evalMap["cv_score"] ?: 0.0);
-            skillsScore = <float>(evalMap["skills_score"] ?: 0.0);
+        } else {
+            cvScore = <float>existingEval.cvScore;
+            skillsScore = <float>existingEval.skillsScore;
             log:printInfo("Retrieved CV scores from DB", cv = cvScore, skills = skillsScore);
         }
         

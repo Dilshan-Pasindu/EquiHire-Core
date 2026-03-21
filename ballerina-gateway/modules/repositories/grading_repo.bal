@@ -51,7 +51,7 @@ public function insertEvaluationResult(string candidateId, string jobId, float c
         "recommended_status": recommendedStatus
     };
     http:Response response = check clients:supabaseHttpClient->post(
-        "/rest/v1/evaluation_results", payload, headers = clients:getSupabaseUpsertHeaders());
+        "/rest/v1/evaluation_results?on_conflict=candidate_id,job_id", payload, headers = clients:getSupabaseUpsertHeaders());
     if response.statusCode >= 300 {
         json err = check response.getJsonPayload();
         return error("insertEvaluationResult failed for candidate " + candidateId + ": " + err.toString());
@@ -70,7 +70,7 @@ public function upsertCvEvaluationResult(string candidateId, string jobId, float
         "recommended_status": recommendedStatus
     };
     http:Response response = check clients:supabaseHttpClient->post(
-        "/rest/v1/evaluation_results", payload, headers = clients:getSupabaseUpsertHeaders());
+        "/rest/v1/evaluation_results?on_conflict=candidate_id,job_id", payload, headers = clients:getSupabaseUpsertHeaders());
     if response.statusCode >= 300 {
         json err = check response.getJsonPayload();
         return error("upsertCvEvaluationResult failed for candidate " + candidateId + ": " + err.toString());

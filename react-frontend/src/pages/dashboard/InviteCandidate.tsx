@@ -14,10 +14,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Mail, Send, CheckCircle, Copy } from 'lucide-react';
 import { AlertMessage } from '@/components/ui/alert-message';
 import type { Job } from '@/types';
+import { z } from 'zod';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 export interface InviteCandidateProps {
   organizationId?: string;
 }
+
+const inviteSchema = z.object({
+  candidateName: z.string().min(2, 'Name must be at least 2 characters'),
+  candidateEmail: z.string().email('Please enter a valid email address'),
+  selectedJobId: z.string().min(1, 'Please select a job role'),
+  interviewDate: z.string().optional(),
+});
+
+type InviteFormValues = z.infer<typeof inviteSchema>;
 
 export default function InviteCandidate({ organizationId }: InviteCandidateProps) {
   const { state } = useAuthContext();
@@ -33,33 +45,37 @@ export default function InviteCandidate({ organizationId }: InviteCandidateProps
     clearError,
   } = useInviteCandidate({ userId, organizationId });
 
-  const [candidateName, setCandidateName] = useState('');
-  const [candidateEmail, setCandidateEmail] = useState('');
-  const [selectedJobId, setSelectedJobId] = useState('');
-  const [interviewDate, setInterviewDate] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [validationError, setValidationError] = useState('');
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isValid, isSubmitting }
+  } = useForm<InviteFormValues>({
+    resolver: zodResolver(inviteSchema),
+    defaultValues: {
+      candidateName: '',
+      candidateEmail: '',
+      selectedJobId: '',
+      interviewDate: '',
+    },
+    mode: 'onTouched',
+  });
 
-  const handleSendInvitation = async () => {
+  const [copied, setCopied] = useState(false);
+
+  const onSubmit = async (data: InviteFormValues) => {
     clearError();
-    setValidationError('');
-    if (!candidateEmail || !candidateName || !selectedJobId) {
-      setValidationError('Please fill in all required fields and select a job');
-      return;
-    }
-    const jobTitle = jobs.find((j) => j.id === selectedJobId)?.title ?? 'Unknown Role';
+    const jobTitle = jobs.find((j) => j.id === data.selectedJobId)?.title ?? 'Unknown Role';
     const ok = await sendInvitation({
-      candidateName,
-      candidateEmail,
-      jobId: selectedJobId,
+      candidateName: data.candidateName,
+      candidateEmail: data.candidateEmail,
+      jobId: data.selectedJobId,
       jobTitle,
-      interviewDate: interviewDate || undefined,
+      interviewDate: data.interviewDate || undefined,
     });
     if (ok) {
-      setCandidateName('');
-      setCandidateEmail('');
-      setSelectedJobId('');
-      setInterviewDate('');
+      reset();
     }
   };
 
@@ -105,56 +121,71 @@ export default function InviteCandidate({ organizationId }: InviteCandidateProps
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <AlertMessage type="error" message={error || validationError} />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <AlertMessage type="error" message={error} />
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <Label htmlFor="candidateName">Candidate Name *</Label>
               <Input
                 id="candidateName"
                 placeholder="John Doe"
-                value={candidateName}
-                onChange={(e) => setCandidateName(e.target.value)}
+                {...register('candidateName')}
+                className={errors.candidateName ? 'border-red-500 bg-red-50' : ''}
               />
+              {errors.candidateName && <span className="text-xs text-red-500 font-medium">{errors.candidateName.message}</span>}
             </div>
-            <div className="space-y-2">
+            
+            <div className="space-y-2 flex flex-col">
               <Label htmlFor="candidateEmail">Candidate Email *</Label>
               <Input
                 id="candidateEmail"
                 type="email"
                 placeholder="candidate@example.com"
-                value={candidateEmail}
-                onChange={(e) => setCandidateEmail(e.target.value)}
+                {...register('candidateEmail')}
+                className={errors.candidateEmail ? 'border-red-500 bg-red-50' : ''}
               />
+              {errors.candidateEmail && <span className="text-xs text-red-500 font-medium">{errors.candidateEmail.message}</span>}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="jobSelect">Job Role *</Label>
-              <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                <SelectTrigger id="jobSelect">
-                  <SelectValue placeholder="Select a job role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobs.map((job: Job) => (
-                    <SelectItem key={job.id ?? 'default'} value={job.id ?? ''}>
-                      {job.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">Create new jobs in the Jobs section.</p>
+            
+            <div className="space-y-2 flex flex-col">
+               <Label htmlFor="jobSelect">Job Role *</Label>
+               <Controller
+                 name="selectedJobId"
+                 control={control}
+                 render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="jobSelect" className={errors.selectedJobId ? 'border-red-500 bg-red-50' : ''}>
+                      <SelectValue placeholder="Select a job role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jobs.map((job: Job) => (
+                        <SelectItem key={job.id ?? 'default'} value={job.id ?? ''}>
+                          {job.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                 )}
+               />
+              {errors.selectedJobId ? (
+                 <span className="text-xs text-red-500 font-medium">{errors.selectedJobId.message}</span>
+              ) : (
+                 <p className="text-xs text-gray-500">Create new jobs in the Jobs section.</p>
+              )}
             </div>
-            <div className="space-y-2">
+            
+            <div className="space-y-2 flex flex-col">
               <Label htmlFor="interviewDate">Interview Date (Optional)</Label>
               <Input
                 id="interviewDate"
                 type="datetime-local"
-                value={interviewDate}
-                onChange={(e) => setInterviewDate(e.target.value)}
+                {...register('interviewDate')}
               />
             </div>
+            
             <Button
-              onClick={handleSendInvitation}
-              disabled={isSending || !candidateName || !candidateEmail || !selectedJobId}
+              type="submit"
+              disabled={isSending || isSubmitting || !isValid}
               className="w-full bg-gray-900 hover:bg-gray-800 text-white h-12"
             >
               <Send className="h-4 w-4 mr-2" aria-hidden />
@@ -163,7 +194,7 @@ export default function InviteCandidate({ organizationId }: InviteCandidateProps
             <p className="text-xs text-gray-500 text-center">
               The candidate will receive an email with a secure magic link valid for 7 days.
             </p>
-          </div>
+          </form>
         )}
       </CardContent>
     </Card>
