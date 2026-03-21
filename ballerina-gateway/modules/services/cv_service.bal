@@ -99,9 +99,10 @@ function saveCvAsync(json parsedData, string candidateId, string jobId, string r
 
     // 3. Save Context Tags (experience level and detected skills)
     check repositories:insertContextTags(candidateId, jobId, expLevel, tech, estimatedYears);
-
+    
     // 4. Save parsed sections
     check repositories:insertCvParsedSections(candidateId, jobId, redacted, edu, work, proj, tech);
+    _ = start evaluateCandidateCv(candidateId);
     log:printInfo("CV and profile saved to Supabase", candidateId = candidateId, jobId = jobId);
 }
 

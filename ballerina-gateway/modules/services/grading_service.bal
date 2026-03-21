@@ -294,19 +294,28 @@ function aggregateAndFinalize(string candidateId, string jobId,
     if count > 0 {
         float interviewAvg = (total / <float>count) * constants:SCORE_SCALE_FACTOR;
         
-        // Fetch existing sub-scores to maintain them
         float cvScore = 0.0;
         float skillsScore = 0.0;
         
+        // Fetch existing sub-scores
         var existingEval = repositories:getCandidateEvaluation(candidateId);
-        if existingEval is record {|decimal overallScore; decimal cvScore; decimal skillsScore; decimal interviewScore; string summaryFeedback;|} {
-            cvScore = <float>existingEval.cvScore;
-            skillsScore = <float>existingEval.skillsScore;
+        
+        if existingEval is error {
+            log:printWarn("Could not fetch existing evaluation scores", candidateId = candidateId, errorMessage = existingEval.message());
+        } else if existingEval is json {
+            
+            map<json> evalMap = <map<json>>existingEval;
+            cvScore = <float>(evalMap["cv_score"] ?: 0.0);
+            skillsScore = <float>(evalMap["skills_score"] ?: 0.0);
+            log:printInfo("Retrieved CV scores from DB", cv = cvScore, skills = skillsScore);
         }
         
+        // Recalculate the weighted overall score
         float overallScore = (cvScore * 0.3) + (skillsScore * 0.2) + (interviewAvg * 0.5);
+        
+        // If no CV screening was done, overall is just the interview score
         if cvScore == 0.0 && skillsScore == 0.0 {
-            overallScore = interviewAvg; // Fallback if no CV screening was done
+            overallScore = interviewAvg; 
         }
 
         string recStatus = overallScore >= constants:PASS_THRESHOLD
@@ -316,18 +325,19 @@ function aggregateAndFinalize(string candidateId, string jobId,
                          "Overall: " + overallScore.toString() + "/100. " +
                          "(Interview: " + interviewAvg.toString() + ")";
 
+        // This call will now include the actual CV and Skills scores instead of 0.0
         error? evalErr = repositories:insertEvaluationResult(
             candidateId, jobId, cvScore, skillsScore, interviewAvg, overallScore, summary, recStatus);
             
         if evalErr is error {
-            log:printError("insertEvaluationResult failed",
-                           'error = evalErr, candidateId = candidateId, sessionId = sessionId);
+            log:printError("insertEvaluationResult failed", 'error = evalErr, candidateId = candidateId);
         }
     }
+    
+    // Mark session as graded
     error? sessErr = repositories:updateExamSession(sessionId, constants:SESSION_GRADED, ());
     if sessErr is error {
-        log:printError("Failed to mark session graded",
-                       'error = sessErr, sessionId = sessionId, candidateId = candidateId);
+        log:printError("Failed to mark session graded", 'error = sessErr, sessionId = sessionId);
     }
 }
 

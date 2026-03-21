@@ -860,3 +860,13 @@ LEFT JOIN public.evaluation_results er  ON er.candidate_id = gr.candidate_id;
 -- recruiter_candidate_view
 --   ADDED    hf_gate_passed, hf_relevance_score, hf_relevance_skipped
 -- ─────────────────────────────────────────────
+
+
+DELETE FROM public.evaluation_results a
+USING public.evaluation_results b
+WHERE a.id < b.id 
+  AND a.candidate_id = b.candidate_id 
+  AND a.job_id = b.job_id;
+
+ALTER TABLE public.evaluation_results 
+ADD CONSTRAINT unique_candidate_per_job UNIQUE (candidate_id, job_id);
