@@ -10,9 +10,9 @@ import type { ParsedCv } from '@/types';
 import FillOutImage from '@/assets/Instruction manual-pana.svg';
 import OnlineTestImage from '@/assets/Online test-amico.svg';
 
-const PrettyJsonObject = ({ data }: { data: any }) => {
+const PrettyJsonObject = ({ data }: { data: Record<string, unknown> | unknown[] | string | number | boolean | null }) => {
     if (typeof data !== 'object' || data === null) return <span>{String(data)}</span>;
-    
+
     return (
         <div className="grid grid-cols-1 gap-y-2 text-sm text-gray-800 w-full">
             {Object.entries(data).map(([key, val]) => {
@@ -450,7 +450,7 @@ export default function CandidateWelcome() {
                                                                 </h4>
                                                                 {isArray ? (
                                                                     <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-[2px] before:bg-gradient-to-b before:from-gray-100 before:via-gray-300 before:to-gray-100">
-                                                                        {(value as any[]).map((itm, idx) => (
+                                                                        {Array.isArray(value) && value.map((itm, idx) => (
                                                                             <div key={idx} className="relative flex items-start gap-5 text-sm text-gray-800 bg-gray-50 border border-gray-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all z-10 w-full">
                                                                                 <div className="w-4 h-4 rounded-full bg-[#FF7300] border-[4px] border-white absolute -left-[30px] top-5 ring-1 ring-gray-300 z-10 hidden md:block" />
                                                                                 <div className="w-full">

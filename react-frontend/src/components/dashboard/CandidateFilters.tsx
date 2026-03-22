@@ -2,7 +2,7 @@
  * @fileoverview Filter controls for the candidate list: status, activity (seen/unseen), and auto-pass threshold.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Eye, EyeOff, Filter, Calculator } from 'lucide-react';
 import type { ActivityFilter, StatusFilter } from '@/types';
 
@@ -48,13 +48,6 @@ export function CandidateFilters({
   const [localCv, setLocalCv] = useState(cvWeight);
   const [localSkills, setLocalSkills] = useState(skillsWeight);
   const [localInterview, setLocalInterview] = useState(interviewWeight);
-
-  useEffect(() => {
-    setLocalThreshold(threshold);
-    setLocalCv(cvWeight);
-    setLocalSkills(skillsWeight);
-    setLocalInterview(interviewWeight);
-  }, [threshold, cvWeight, skillsWeight, interviewWeight]);
 
   const totalWeight = localCv + localSkills + localInterview;
   const isWeightValid = totalWeight === 100;
