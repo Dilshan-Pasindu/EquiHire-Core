@@ -9,38 +9,20 @@ services:
     networks:
       - equihire-network
 
-  python-ai-engine:
-    build: ./python-ai-engine
-    container_name: equihire-python-engine
+  ballerina-gateway:
+    build: ./ballerina-gateway
+    container_name: equihire-ballerina-gateway
     ports:
-      - "8000:8000"
+      - "9090:9090"
+      - "9091:9091"
     environment:
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
     depends_on:
       - redis
     networks:
       - equihire-network
     volumes:
-        - ./python-ai-engine:/app
-
-  # Ballerina Gateway is best run natively for development (`bal run`)
-  # due to Config.toml and dependency management.
-  # To run in Docker, uncomment below and ensure Config.toml is mounted.
-  
-  # ballerina-gateway:
-  #   build: ./ballerina-gateway
-  #   container_name: equihire-ballerina-gateway
-  #   ports:
-  #     - "9090:9090"
-  #   environment:
-  #     - PYTHON_SERVICE_URL=http://python-ai-engine:8000
-  #     - REDIS_HOST=redis
-  #   depends_on:
-  #     - redis
-  #     - python-ai-engine
-  #   networks:
-  #     - equihire-network
+      - ./ballerina-gateway/Config.toml:/app/Config.toml
 
 networks:
   equihire-network:
