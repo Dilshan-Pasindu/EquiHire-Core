@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Activity, Shield, Clock, Users, AlertCircle, RefreshCw, BarChart2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Area, AreaChart, CartesianGrid, XAxis, PieChart, Pie } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import CandidateViolations from './CandidateViolations';
 
 export default function AuditAndStatistics() {
@@ -42,7 +42,7 @@ export default function AuditAndStatistics() {
       color: curr.fill,
     };
     return acc;
-  }, {} as any);
+  }, {} as ChartConfig);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
