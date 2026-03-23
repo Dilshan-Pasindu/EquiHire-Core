@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Activity, Shield, Clock, Users, AlertCircle, RefreshCw, BarChart2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Area, AreaChart, CartesianGrid, XAxis, PieChart, Pie, Cell } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, PieChart, Pie } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import CandidateViolations from './CandidateViolations';
 
@@ -28,6 +28,21 @@ export default function AuditAndStatistics() {
     refresh,
     getActionColor,
   } = useAudit({ userId, autoRefreshMs: 30000 });
+
+  const activityChartConfig = {
+    count: {
+      label: "Events",
+      color: "hsl(var(--primary))",
+    },
+  };
+
+  const actionChartConfig = actionDistribution.reduce((acc, curr) => {
+    acc[curr.action] = {
+      label: curr.action.charAt(0).toUpperCase() + curr.action.slice(1),
+      color: curr.fill,
+    };
+    return acc;
+  }, {} as any);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -101,18 +116,19 @@ export default function AuditAndStatistics() {
             ) : activityTimeSeries.length === 0 ? (
                <div className="h-[240px] flex items-center justify-center text-gray-400 text-sm">No activity recorded</div>
             ) : (
-               <ChartContainer config={{ count: { label: "Events", color: "#10B981" } }} className="h-[240px] w-full pr-6">
+               <ChartContainer config={activityChartConfig} className="h-[240px] w-full pr-6">
                  <AreaChart data={activityTimeSeries} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                   <defs>
-                     <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                       <stop offset="5%" stopColor="#10B981" stopOpacity={0.4}/>
-                       <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                     </linearGradient>
-                   </defs>
                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                    <XAxis dataKey="date" stroke="#9CA3AF" fontSize={11} tickLine={false} axisLine={false} />
                    <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
-                   <Area type="monotone" dataKey="count" stroke="#10B981" fillOpacity={1} fill="url(#colorCount)" strokeWidth={2} />
+                   <Area 
+                      type="monotone" 
+                      dataKey="count" 
+                      stroke="var(--color-count)" 
+                      fillOpacity={0.2} 
+                      fill="var(--color-count)" 
+                      strokeWidth={2} 
+                    />
                  </AreaChart>
                </ChartContainer>
             )}
@@ -133,10 +149,10 @@ export default function AuditAndStatistics() {
             ) : actionDistribution.length === 0 ? (
                <div className="h-[240px] flex items-center justify-center text-gray-400 text-sm">No distribution data</div>
             ) : (
-               <ChartContainer config={{}} className="h-[240px] w-full [&_.recharts-pie-label-text]:fill-gray-600">
+               <ChartContainer config={actionChartConfig} className="h-[240px] w-full [&_.recharts-pie-label-text]:fill-gray-600 font-medium">
                  <PieChart>
                    <Pie
-                     data={actionDistribution}
+                     data={actionDistribution.map(d => ({ ...d, fill: `var(--color-${d.action})` }))}
                      cx="50%"
                      cy="50%"
                      innerRadius={65}
@@ -145,12 +161,8 @@ export default function AuditAndStatistics() {
                      dataKey="count"
                      nameKey="action"
                      stroke="none"
-                   >
-                     {actionDistribution.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={entry.fill} />
-                     ))}
-                   </Pie>
-                   <ChartTooltip content={<ChartTooltipContent nameKey="action" />} />
+                   />
+                   <ChartTooltip content={<ChartTooltipContent nameKey="action" hideLabel />} />
                  </PieChart>
                </ChartContainer>
             )}

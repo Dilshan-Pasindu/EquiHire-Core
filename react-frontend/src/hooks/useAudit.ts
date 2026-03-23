@@ -20,7 +20,7 @@ export interface ActivityPoint {
 export interface ActionDistribution {
   action: string;
   count: number;
-  fill: string; // Color code for pie chart
+  fill: string; 
 }
 
 export interface UseAuditOptions {
