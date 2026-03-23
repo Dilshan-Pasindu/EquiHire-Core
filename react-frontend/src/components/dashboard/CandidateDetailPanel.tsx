@@ -10,7 +10,6 @@ import {
   FileText,
   Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { API } from '@/lib/api';
@@ -33,7 +32,6 @@ export function CandidateDetailPanel({
   onClose,
   onApplyDecision,
 }: CandidateDetailPanelProps) {
-  const [showTranscript, setShowTranscript] = useState(false);
   const isDecisionMade = ['accepted', 'rejected'].includes(candidate.status);
   const canViewTranscript = candidate.status === 'accepted';
 
@@ -353,10 +351,10 @@ export function CandidateDetailPanel({
                 <Button
                   className="w-full"
                   variant="outline"
-                  onClick={() => setShowTranscript(!showTranscript)}
+                  onClick={() => window.open(`/transcript?candidateId=${candidate.candidateId}`, '_blank')}
                 >
                   <FileText className="w-4 h-4 mr-2" aria-hidden />
-                  {showTranscript ? 'Hide' : 'View'} Full Transcript
+                  View Full Transcript
                 </Button>
               </div>
             )}
@@ -369,48 +367,6 @@ export function CandidateDetailPanel({
               </div>
             )}
 
-            {showTranscript && canViewTranscript && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h5 className="font-semibold text-sm text-blue-900 mb-3">Full Profile & Interview Transcript</h5>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs font-semibold text-blue-700 mb-1">Candidate ID</p>
-                    <p className="text-sm text-blue-900 font-mono">{candidate.candidateId}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-blue-700 mb-1">Experience Level</p>
-                    <p className="text-sm text-blue-900 capitalize">{candidate.experienceLevel || 'Not extracted'}</p>
-                  </div>
-                  {candidate.detectedStack && candidate.detectedStack.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-blue-700 mb-1">Technical Skills</p>
-                      <div className="flex flex-wrap gap-1">
-                        {candidate.detectedStack.map((skill, i) => (
-                          <span key={i} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {candidate.summaryFeedback && (
-                    <div>
-                      <p className="text-xs font-semibold text-blue-700 mb-1">Interview Feedback</p>
-                      <p className="text-xs text-blue-900 leading-relaxed">{candidate.summaryFeedback}</p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xs font-semibold text-blue-700 mb-1 pt-2 border-t border-blue-200">Evaluation Scores</p>
-                    <div className="text-xs text-blue-900 space-y-1">
-                      <div>• CV Score: {candidate.cvScore || 'N/A'}/100</div>
-                      <div>• Skills Score: {candidate.skillsScore || 'N/A'}/100</div>
-                      <div>• Interview Score: {candidate.interviewScore || 'N/A'}/100</div>
-                      <div className="font-semibold pt-1">• Overall Score: {candidate.score || 'N/A'}/100</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>

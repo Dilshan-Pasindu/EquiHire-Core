@@ -79,3 +79,23 @@ export interface StartSessionResponse {
   sessionId: string;
   status: string;
 }
+
+/** Transcript: Single interview question and candidate's graded answer. */
+export interface TranscriptItem {
+  questionText: string;
+  questionType: string;
+  sampleAnswer: string;
+  redactedAnswer: string;
+  score: number;
+  feedback: string;
+  hfGatePassed: boolean;
+  wasFlagged: boolean;
+}
+
+/** Transcript: Full candidate interview transcript response. */
+export interface TranscriptResponse {
+  candidateId: string;
+  candidateName: string;
+  transcript: TranscriptItem[];
+}
+

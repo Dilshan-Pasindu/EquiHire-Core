@@ -93,3 +93,21 @@ public type DecisionResponse record {|
     decimal interviewScore;
     string message;
 |};
+// Transcript item (question + answer details for recruiter review).
+public type TranscriptItem record {|
+    string questionText;
+    string questionType;
+    string sampleAnswer;
+    string redactedAnswer;
+    int score;
+    string feedback;
+    boolean hfGatePassed;
+    boolean wasFlagged;
+|};
+
+// Transcript response.
+public type TranscriptResponse record {|
+    string candidateId;
+    string candidateName;
+    TranscriptItem[] transcript;
+|};

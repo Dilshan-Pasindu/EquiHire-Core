@@ -348,6 +348,15 @@ export async function revealCandidate(candidateId: string): Promise<{ url: strin
   return response.json();
 }
 
+/**
+ * Fetches the transcript for a candidate.
+ */
+export async function getTranscript(candidateId: string): Promise<import('@/types').TranscriptResponse> {
+  const response = await fetch(`${API_BASE_URL}/candidates/${candidateId}/transcript`);
+  if (!response.ok) throw new Error('Failed to fetch transcript');
+  return response.json();
+}
+
 /** Central API object — all functions are also exported individually above. */
 export const API = {
   getOrganization,
@@ -381,5 +390,6 @@ export const API = {
   updateQuestion,
   getAuditLogs,
   revealCandidate,
+  getTranscript,
 };
 

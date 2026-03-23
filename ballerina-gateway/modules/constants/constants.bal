@@ -74,3 +74,6 @@ public const string AUDIT_SEND_INVITATION  = "Send Invitation";
 public const string AUDIT_SUBMIT_ASSESSMENT = "Submit Assessment";
 public const string AUDIT_CREATE_TEMPLATE  = "Create Evaluation Template";
 public const string AUDIT_FLAG_LEGACY      = "Lockdown Violation (Legacy)";
+public const string AUDIT_CANDIDATE_ACCEPTED = "Candidate Accepted";
+public const string AUDIT_CANDIDATE_REJECTED = "Candidate Rejected";
+

@@ -132,6 +132,41 @@ public function createAuditLog(string organizationId, string? recruiterId, strin
     }
 }
 
+public function getCandidateTranscript(string candidateId) returns types:TranscriptItem[]|error {
+    // We join grading_results with questions using PostgREST join syntax.
+    string path = string `/rest/v1/grading_results?candidate_id=eq.${candidateId}&select=redacted_answer,score,feedback,hf_gate_passed,was_flagged,questions(question_text,type,sample_answer)`;
+    
+    http:Response response = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    
+    if response.statusCode >= 300 {
+        return error("getCandidateTranscript failed for candidate " + candidateId);
+    }
+    
+    json[] rows = <json[]>check response.getJsonPayload();
+    types:TranscriptItem[] transcript = [];
+    
+    foreach json row in rows {
+        map<json> r = <map<json>>row;
+        // PostgREST embeds joined records as a nested object/array.
+        json qObj = r["questions"];
+        if qObj is map<json> {
+            transcript.push({
+                questionText: qObj["question_text"].toString(),
+                questionType: qObj["type"].toString(),
+                sampleAnswer: qObj["sample_answer"] is () ? "" : qObj["sample_answer"].toString(),
+                redactedAnswer: r["redacted_answer"].toString(),
+                score: check r["score"].ensureType(int),
+                feedback: r["feedback"].toString(),
+                hfGatePassed: check r["hf_gate_passed"].ensureType(boolean),
+                wasFlagged: check r["was_flagged"].ensureType(boolean)
+            });
+        }
+    }
+    
+    return transcript;
+}
+
 // ---------------------------------------------------------------------------
 // Invitations
 // ---------------------------------------------------------------------------

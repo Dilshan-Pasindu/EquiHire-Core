@@ -167,6 +167,50 @@ public function getJobIdForCandidate(string candidateId) returns string|error {
     return (<map<json>>rows[0])["job_id"].toString();
 }
 
+public function getOrganizationIdForCandidate(string candidateId) returns string|error {
+    string jobId = check getJobIdForCandidate(candidateId);
+    string path = string `/rest/v1/jobs?id=eq.${jobId}&select=organization_id`;
+    http:Response response = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    if response.statusCode >= 300 {
+        return error("getOrganizationIdForCandidate: job lookup failed");
+    }
+    json[] rows = <json[]>check response.getJsonPayload();
+    if rows.length() == 0 {
+        return error("Job not found for candidate: " + candidateId);
+    }
+    return (<map<json>>rows[0])["organization_id"].toString();
+}
+
+public function getCandidateDisplayName(string candidateId) returns string|error {
+    string path = string `/rest/v1/anonymous_profiles?candidate_id=eq.${candidateId}&select=status,invitation_id`;
+    http:Response resp = check clients:supabaseHttpClient->get(
+        path, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+    if resp.statusCode >= 300 { return error("getCandidateDisplayName: profile not found"); }
+    json[] profiles = <json[]>check resp.getJsonPayload();
+    if profiles.length() == 0 { return error("Candidate not found: " + candidateId); }
+    
+    map<json> p = <map<json>>profiles[0];
+    string status = p["status"].toString();
+    string invId = p["invitation_id"] is () ? "" : p["invitation_id"].toString();
+    
+    if status == constants:STATUS_ACCEPTED && invId != "" {
+        string invPath = string `/rest/v1/interview_invitations?id=eq.${invId}&select=candidate_name`;
+        http:Response iResp = check clients:supabaseHttpClient->get(
+            invPath, headers = clients:getSupabaseHeaders(), targetType = http:Response);
+        if iResp.statusCode < 300 {
+            json[] invs = <json[]>check iResp.getJsonPayload();
+            if invs.length() > 0 {
+                return (<map<json>>invs[0])["candidate_name"].toString();
+            }
+        }
+    }
+    
+    return string `Candidate #${candidateId.substring(0, 8)}`;
+}
+
+
+
 public function getCvRawText(string candidateId) returns string|error {
     string path = string `/rest/v1/cv_parsed_sections?candidate_id=eq.${candidateId}&select=raw_text`;
     http:Response response = check clients:supabaseHttpClient->get(

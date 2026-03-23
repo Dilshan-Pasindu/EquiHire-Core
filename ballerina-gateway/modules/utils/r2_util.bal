@@ -72,14 +72,23 @@ public function generateR2PresignedUrl(string accessKey, string secretKey,
     string dateStamp = amzDate.substring(0, 8);
     string credentialScope = dateStamp + "/" + region + "/s3/aws4_request";
     string credential = accessKey + "/" + credentialScope;
+
+    // AWS SigV4 spec: the credential value MUST be percent-encoded in the
+    // canonical query string (slashes → %2F). The URL uses the same encoded form,
+    // so signature computation and the final URL stay consistent.
+    string encodedCredential = re`/`.replaceAll(credential, "%2F");
+
     string signedHeaders = "host";
 
     string canonicalUri = "/" + bucketName + "/" + objectKey;
+
+    // Build canonical query string using the ENCODED credential (required by SigV4)
     string canonicalQueryString = "X-Amz-Algorithm=AWS4-HMAC-SHA256"
-        + "&X-Amz-Credential=" + credential
+        + "&X-Amz-Credential=" + encodedCredential
         + "&X-Amz-Date=" + amzDate
         + "&X-Amz-Expires=" + expiresInSeconds.toString()
         + "&X-Amz-SignedHeaders=" + signedHeaders;
+
     string canonicalHeaders = "host:" + host + "\n";
 
     string canonicalRequest = httpMethod + "\n" + canonicalUri + "\n" +
@@ -93,9 +102,11 @@ public function generateR2PresignedUrl(string accessKey, string secretKey,
     byte[] sigBytes = check crypto:hmacSha256(stringToSign.toBytes(), signingKey);
     string signature = sigBytes.toBase16();
 
+    // Final URL uses the encoded credential (same as canonical query string)
     return "https://" + host + canonicalUri + "?" + canonicalQueryString +
         "&X-Amz-Signature=" + signature;
 }
+
 
 // ---------------------------------------------------------------------------
 // Helpers

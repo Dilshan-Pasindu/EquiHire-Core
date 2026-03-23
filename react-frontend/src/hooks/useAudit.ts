@@ -1,5 +1,6 @@
 /**
  * @fileoverview Hook for audit logs and stats; supports refresh and auto-refresh interval.
+ * Uses a sequential professional palette for varied chart colors.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -20,7 +21,7 @@ export interface ActivityPoint {
 export interface ActionDistribution {
   action: string;
   count: number;
-  fill: string; 
+  fill: string;
 }
 
 export interface UseAuditOptions {
@@ -41,7 +42,26 @@ export interface UseAuditResult {
   refresh: () => Promise<void>;
   /** Tailwind classes for action badge by action string. */
   getActionColor: (action: string) => string;
+  /** Get the hex color associated with an action (matching the chart). */
+  getActionHex: (action: string) => string;
 }
+
+const CHART_PALETTE = [
+  '#4F46E5', // Indigo 600
+  '#0EA5E9', // Sky 600
+  '#10B981', // Emerald 600
+  '#F59E0B', // Amber 600
+  '#3B82F6', // Blue 600 (The "Good" Blue)
+  '#8B5CF6', // Violet 600
+  '#EC4899', // Pink 600
+  '#14B8A6', // Teal 600
+  '#F97316', // Orange 600
+  '#6366F1', // Indigo 500
+  '#2563EB', // Blue 700
+  '#059669', // Emerald 700
+  '#D97706', // Amber 700
+  '#64748B', // Slate 600
+];
 
 /**
  * Loads audit logs for the user's organization and computes basic stats.
@@ -58,26 +78,29 @@ export function useAudit({
   const [orgId, setOrgId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [actionColors, setActionColors] = useState<Map<string, string>>(new Map());
 
   const getActionColor = useCallback((action: string) => {
     const a = action.toLowerCase();
-    if (a.includes('delete') || a.includes('remove') || a.includes('violation')) return 'text-red-600 bg-red-50';
-    if (a.includes('create') || a.includes('add') || a.includes('invite') || a.includes('submit')) return 'text-green-600 bg-green-50';
-    if (a.includes('update') || a.includes('edit') || a.includes('send')) return 'text-blue-600 bg-blue-50';
-    if (a.includes('login') || a.includes('auth')) return 'text-purple-600 bg-purple-50';
-    if (a.includes('lockdown') || a.includes('flag') || a.includes('cheat')) return 'text-orange-600 bg-orange-50';
-    return 'text-gray-600 bg-gray-50';
+    if (a.includes('delete') || a.includes('remove')) return 'text-red-700 bg-red-50 border-red-100';
+    if (a.includes('create') || a.includes('add')) return 'text-emerald-700 bg-emerald-50 border-emerald-100';
+    if (a.includes('update') || a.includes('edit')) return 'text-sky-700 bg-sky-50 border-sky-100';
+    if (a.includes('invite')) return 'text-indigo-700 bg-indigo-50 border-indigo-100';
+    if (a.includes('submit')) return 'text-violet-700 bg-violet-50 border-violet-100';
+    if (a.includes('login') || a.includes('auth')) return 'text-purple-700 bg-purple-50 border-purple-100';
+    if (a.includes('lockdown') || a.includes('cheat') || a.includes('violation')) return 'text-orange-700 bg-orange-50 border-orange-100';
+    if (a.includes('reveal') || a.includes('view') || a.includes('acceptance') || a.includes('send')) return 'text-blue-700 bg-blue-50 border-blue-100';
+    if (a.includes('sync') || a.includes('refresh')) return 'text-cyan-700 bg-cyan-50 border-cyan-100';
+    if (a.includes('export') || a.includes('download')) return 'text-amber-700 bg-amber-50 border-amber-100';
+    if (a.includes('flag') || a.includes('alert')) return 'text-rose-700 bg-rose-50 border-rose-100';
+    if (a.includes('filter') || a.includes('search')) return 'text-teal-700 bg-teal-50 border-teal-100';
+    return 'text-slate-600 bg-slate-50 border-slate-100';
   }, []);
 
-  const getActionHexColor = useCallback((action: string) => {
-    const colorClass = getActionColor(action);
-    if (colorClass.includes('red-600')) return '#DC2626';     // tailwind red-600
-    if (colorClass.includes('green-600')) return '#16A34A';   // tailwind green-600
-    if (colorClass.includes('blue-600')) return '#2563EB';    // tailwind blue-600
-    if (colorClass.includes('purple-600')) return '#9333EA';  // tailwind purple-600
-    if (colorClass.includes('orange-600')) return '#EA580C';  // tailwind orange-600
-    return '#4B5563'; // tailwind gray-600
-  }, [getActionColor]);
+  const getActionHex = useCallback((action: string) => {
+    return actionColors.get(action) || '#64748B';
+  }, [actionColors]);
+
 
   const computeChartData = useCallback((auditLogs: AuditLog[]) => {
     // 1. Time Series: last 7 days including today
@@ -104,15 +127,21 @@ export function useAudit({
     });
 
     const timeSeriesData = Array.from(seriesMap.entries()).map(([date, count]) => ({ date, count }));
-    
-    // Convert to sorted array for pie chart and map colors
-    const distData = Array.from(distMap.entries())
-      .map(([action, count]) => ({ action, count, fill: getActionHexColor(action) }))
-      .sort((a, b) => b.count - a.count); // Largest slices first
 
+    const colorMap = new Map<string, string>();
+    const distData = Array.from(distMap.entries())
+      .map(([action, count], index) => {
+        const isSend = action.toLowerCase().includes('send');
+        const fill = isSend ? '#3B82F6' : CHART_PALETTE[index % CHART_PALETTE.length];
+        colorMap.set(action, fill);
+        return { action, count, fill };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    setActionColors(colorMap);
     setActivityTimeSeries(timeSeriesData);
     setActionDistribution(distData);
-  }, [getActionHexColor]);
+  }, []);
 
   const refreshLogs = useCallback(async (id: string) => {
     try {
@@ -125,7 +154,7 @@ export function useAudit({
       setStats({ total: list.length, today: todayLogs.length, actors: uniqueActors.size });
 
       computeChartData(list);
-      
+
       setLastSynced(new Date());
     } catch (err) {
       console.error('Failed to refresh audit logs', err);
@@ -178,5 +207,6 @@ export function useAudit({
     isSyncing,
     refresh,
     getActionColor,
+    getActionHex,
   };
 }

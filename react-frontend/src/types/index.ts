@@ -38,4 +38,6 @@ export type {
   AnswerSubmission,
   SubmitAssessmentPayload,
   StartSessionResponse,
+  TranscriptItem,
+  TranscriptResponse,
 } from './api';

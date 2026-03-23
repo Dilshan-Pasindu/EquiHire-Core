@@ -13,6 +13,7 @@ import CandidateWelcome from '@/pages/candidate/Welcome';
 import CandidateInterview from '@/pages/candidate/Interview';
 import InviteHandler from '@/pages/candidate/InviteHandler';
 import OrganizationSetup from '@/pages/onboarding/OrganizationSetup';
+import CandidateTranscript from '@/pages/dashboard/views/CandidateTranscript';
 import UserGuide from '@/components/documentation/UserGuide';
 import ApiDocs from '@/components/documentation/ApiDocs';
 import { LoadingScreen } from '@/components/ui/loading-screen';
@@ -29,6 +30,7 @@ function App() {
   if (path.startsWith('/invite/')) return <InviteHandler />;
   if (path === '/candidate/welcome') return <CandidateWelcome />;
   if (path === '/candidate/interview') return <CandidateInterview />;
+  if (path === '/transcript') return <CandidateTranscript />;
   if (path === '/documentation/guide') return <UserGuide />;
   if (path === '/documentation/api') return <ApiDocs />;
 

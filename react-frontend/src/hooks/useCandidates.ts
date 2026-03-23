@@ -113,7 +113,7 @@ export function useCandidates({ userId }: UseCandidatesOptions): UseCandidatesRe
       const cvP = typeof c.cvScore === 'number' ? c.cvScore : 0;
       const skillsP = typeof c.skillsScore === 'number' ? c.skillsScore : 0;
       const intP = typeof c.interviewScore === 'number' ? c.interviewScore : 0;
-      
+
       if (cvP > 0 || skillsP > 0 || intP > 0) {
         const weightedScore = Math.round(
           (cvP * cvWeight + skillsP * skillsWeight + intP * interviewWeight) / 100
@@ -141,7 +141,7 @@ export function useCandidates({ userId }: UseCandidatesOptions): UseCandidatesRe
   });
 
 
-  const activeSelectedCandidate = selectedCandidate 
+  const activeSelectedCandidate = selectedCandidate
     ? filteredCandidates.find(c => c.candidateId === selectedCandidate.candidateId) || selectedCandidate
     : null;
 
@@ -217,7 +217,7 @@ export function useCandidates({ userId }: UseCandidatesOptions): UseCandidatesRe
         console.error('Reject failed:', error);
         throw error;
       } finally {
-       setIsProcessing(false);
+        setIsProcessing(false);
       }
     },
     [threshold, orgId, fetchCandidates]

@@ -8,9 +8,9 @@ import { useAudit } from '@/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Activity, Shield, Clock, Users, AlertCircle, RefreshCw, BarChart2 } from 'lucide-react';
+import { Activity, Clock, Users, AlertCircle, RefreshCw, BarChart2, History, PieChart as PieChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Area, AreaChart, CartesianGrid, XAxis, PieChart, Pie } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, PieChart, Pie, Label } from 'recharts';
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import CandidateViolations from './CandidateViolations';
 
@@ -26,18 +26,20 @@ export default function AuditAndStatistics() {
     isLoading,
     isSyncing,
     refresh,
-    getActionColor,
+    getActionHex,
   } = useAudit({ userId, autoRefreshMs: 30000 });
 
   const activityChartConfig = {
     count: {
       label: "Events",
-      color: "hsl(var(--primary))",
+      color: "var(--primary)",
     },
   };
 
   const actionChartConfig = actionDistribution.reduce((acc, curr) => {
-    acc[curr.action] = {
+    // Slugify action names for safe CSS variable keys
+    const key = curr.action.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    acc[key] = {
       label: curr.action.charAt(0).toUpperCase() + curr.action.slice(1),
       color: curr.fill,
     };
@@ -50,7 +52,7 @@ export default function AuditAndStatistics() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div className="bg-primary/10 p-2 rounded-xl">
-               <Activity className="w-6 h-6 text-primary animate-pulse" />
+              <Activity className="w-6 h-6 text-primary animate-pulse" />
             </div>
             <div>
               <h2 className="text-2xl font-black tracking-tight text-gray-900 bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-500">Audit & Statistics</h2>
@@ -103,68 +105,109 @@ export default function AuditAndStatistics() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
         {/* Activity Over Time Chart */}
-        <Card className="shadow-sm border-gray-200/60 w-full overflow-hidden">
-          <CardHeader className="pb-2 bg-gray-50/50">
-            <CardTitle className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+        <Card className="shadow-sm border-gray-200/60 overflow-hidden">
+          <CardHeader className="pb-2 bg-gray-50/50 border-b border-gray-100/50">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <BarChart2 className="w-4 h-4 text-primary" />
               Activity Over Time (7 Days)
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6 px-1">
+          <CardContent className="pt-6 px-1 lg:px-6">
             {isLoading ? (
-               <Skeleton className="h-[240px] w-full mx-4" />
+              <Skeleton className="h-[240px] w-full mx-4" />
             ) : activityTimeSeries.length === 0 ? (
-               <div className="h-[240px] flex items-center justify-center text-gray-400 text-sm">No activity recorded</div>
+              <div className="h-[240px] flex items-center justify-center text-gray-400 text-sm">No activity recorded</div>
             ) : (
-               <ChartContainer config={activityChartConfig} className="h-[240px] w-full pr-6">
-                 <AreaChart data={activityTimeSeries} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
-                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                   <XAxis dataKey="date" stroke="#9CA3AF" fontSize={11} tickLine={false} axisLine={false} />
-                   <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
-                   <Area 
-                      type="monotone" 
-                      dataKey="count" 
-                      stroke="var(--color-count)" 
-                      fillOpacity={0.2} 
-                      fill="var(--color-count)" 
-                      strokeWidth={2} 
-                    />
-                 </AreaChart>
-               </ChartContainer>
+              <ChartContainer config={activityChartConfig} className="h-[240px] w-full pr-6">
+                <AreaChart data={activityTimeSeries} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="fillCount" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-count)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="date" stroke="#9CA3AF" fontSize={11} tickLine={false} axisLine={false} />
+                  <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    stroke="var(--color-count)"
+                    fillOpacity={1}
+                    fill="url(#fillCount)"
+                    strokeWidth={3}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                  />
+                </AreaChart>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
 
         {/* Action Distribution Chart */}
-        <Card className="shadow-sm border-gray-200/60 w-full overflow-hidden">
-          <CardHeader className="pb-2 bg-gray-50/50">
-            <CardTitle className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue-500" />
+        <Card className="shadow-sm border-gray-200/60 overflow-hidden">
+          <CardHeader className="pb-2 bg-gray-50/50 border-b border-gray-100/50">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <PieChartIcon className="w-4 h-4 text-blue-500" />
               Action Distribution
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6 flex justify-center w-full">
+          <CardContent className="pt-6 flex justify-center">
             {isLoading ? (
-               <Skeleton className="h-[240px] w-full mx-4" />
+              <Skeleton className="h-[240px] w-full" />
             ) : actionDistribution.length === 0 ? (
-               <div className="h-[240px] flex items-center justify-center text-gray-400 text-sm">No distribution data</div>
+              <div className="h-[240px] flex items-center justify-center text-gray-400 text-sm">No distribution data</div>
             ) : (
-               <ChartContainer config={actionChartConfig} className="h-[240px] w-full [&_.recharts-pie-label-text]:fill-gray-600 font-medium">
-                 <PieChart>
-                   <Pie
-                     data={actionDistribution.map(d => ({ ...d, fill: `var(--color-${d.action})` }))}
-                     cx="50%"
-                     cy="50%"
-                     innerRadius={65}
-                     outerRadius={95}
-                     paddingAngle={3}
-                     dataKey="count"
-                     nameKey="action"
-                     stroke="none"
-                   />
-                   <ChartTooltip content={<ChartTooltipContent nameKey="action" hideLabel />} />
-                 </PieChart>
-               </ChartContainer>
+              <ChartContainer config={actionChartConfig} className="h-[240px] w-full [&_.recharts-pie-label-text]:fill-gray-600 font-medium">
+                <PieChart>
+                  <Pie
+                    data={actionDistribution.map(d => ({
+                      ...d,
+                      fill: `var(--color-${d.action.toLowerCase().replace(/[^a-z0-9]/g, '-')})`
+                    }))}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={75}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="count"
+                    nameKey="action"
+                    stroke="#fff"
+                    strokeWidth={2}
+                  >
+                    <Label
+                      content={({ viewBox }) => {
+                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                          return (
+                            <text
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                            >
+                              <tspan
+                                x={viewBox.cx}
+                                y={viewBox.cy}
+                                className="fill-foreground text-3xl font-bold"
+                              >
+                                {stats.total.toLocaleString()}
+                              </tspan>
+                              <tspan
+                                x={viewBox.cx}
+                                y={(viewBox.cy || 0) + 24}
+                                className="fill-muted-foreground text-[10px] uppercase tracking-wider font-semibold"
+                              >
+                                Total Logs
+                              </tspan>
+                            </text>
+                          )
+                        }
+                      }}
+                    />
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="action" hideLabel />} />
+                </PieChart>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
@@ -172,13 +215,13 @@ export default function AuditAndStatistics() {
 
       <Tabs defaultValue="audit" className="space-y-6">
         <TabsList className="bg-white/50 border border-gray-200/60 p-1 w-full sm:w-auto h-auto grid grid-cols-2 rounded-xl">
-          <TabsTrigger 
+          <TabsTrigger
             value="audit"
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm py-2 px-4 transition-all"
           >
             System Audit Logs
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="violations"
             className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm py-2 px-4 transition-all"
           >
@@ -188,80 +231,90 @@ export default function AuditAndStatistics() {
 
         <TabsContent value="audit" className="space-y-8 focus-visible:outline-none focus-visible:ring-0">
 
-      <Card className="shadow-sm border-gray-200">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Shield className="w-4 h-4 text-gray-500" aria-hidden />
-            Audit Trail
-            <span className="ml-auto text-xs font-normal text-gray-400">Auto-refreshes every 30s</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-0">
-               <div className="bg-gray-50 border-b border-gray-100 flex px-6 py-3 space-x-4">
-                  {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-4 flex-1" />)}
-               </div>
-               <div className="divide-y divide-gray-100">
-                  {[1,2,3,4,5].map(i => (
-                    <div key={i} className="px-6 py-4 flex space-x-4">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-20 rounded-full" />
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 flex-1" />
-                    </div>
-                  ))}
-               </div>
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <AlertCircle className="w-8 h-8 mb-3" aria-hidden />
-              <p className="text-sm">No audit logs recorded yet.</p>
-              <p className="text-xs text-gray-400 mt-1">Actions will appear here as they happen.</p>
-            </div>
-          ) : (
-            <div className="overflow-auto max-h-[500px]">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 sticky top-0">
-                  <tr>
-                    <th className="px-6 py-3 text-left">Time</th>
-                    <th className="px-6 py-3 text-left">Action</th>
-                    <th className="px-6 py-3 text-left">Actor</th>
-                    <th className="px-6 py-3 text-left">Target</th>
-                    <th className="px-6 py-3 text-left">Details</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-3 text-gray-400 whitespace-nowrap text-xs">
-                        {new Date(log.created_at).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getActionColor(log.action)}`}
-                        >
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-gray-700 font-medium text-xs">{log.actor}</td>
-                      <td className="px-6 py-3 text-gray-600 text-xs font-mono">{log.target}</td>
-                      <td className="px-6 py-3 text-gray-500 text-xs max-w-[200px] truncate">{log.details}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      </TabsContent>
+          <Card className="shadow-sm border-gray-200/60 overflow-hidden">
+            <CardHeader className="pb-3 bg-gray-50/50 border-b border-gray-100/50">
+              <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <History className="w-4 h-4 text-indigo-500" aria-hidden />
+                Audit Trail
+                <span className="ml-auto text-[10px] font-semibold text-gray-400 uppercase tracking-widest bg-gray-100/50 px-2 py-1 rounded">Auto-refreshes 30s</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="p-0">
+                  <div className="bg-gray-50 border-b border-gray-100 flex px-6 py-3 space-x-4">
+                    {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-4 flex-1" />)}
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <div key={i} className="px-6 py-4 flex space-x-4">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-20 rounded-full" />
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 flex-1" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <AlertCircle className="w-8 h-8 mb-3" aria-hidden />
+                  <p className="text-sm">No audit logs recorded yet.</p>
+                  <p className="text-xs text-gray-400 mt-1">Actions will appear here as they happen.</p>
+                </div>
+              ) : (
+                <div className="overflow-auto max-h-[500px]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50/80 text-gray-500 font-semibold border-b border-gray-100 sticky top-0 backdrop-blur-sm z-10">
+                      <tr>
+                        <th className="px-6 py-4 text-left uppercase tracking-wider text-[10px]">Time</th>
+                        <th className="px-6 py-4 text-left uppercase tracking-wider text-[10px]">Action</th>
+                        <th className="px-6 py-4 text-left uppercase tracking-wider text-[10px]">Actor</th>
+                        <th className="px-6 py-4 text-left uppercase tracking-wider text-[10px]">Target</th>
+                        <th className="px-6 py-4 text-left uppercase tracking-wider text-[10px]">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {logs.map((log) => (
+                        <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-3 text-gray-400 whitespace-nowrap text-xs">
+                            {new Date(log.created_at).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4">
+                            {(() => {
+                              const fill = getActionHex(log.action);
+                              return (
+                                <span
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider"
+                                  style={{
+                                    backgroundColor: `${fill}15`,
+                                    color: fill,
+                                    borderColor: `${fill}30`
+                                  }}
+                                >
+                                  {log.action}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-6 py-3 text-gray-700 font-medium text-xs">{log.actor}</td>
+                          <td className="px-6 py-3 text-gray-600 text-xs font-mono">{log.target}</td>
+                          <td className="px-6 py-3 text-gray-500 text-xs max-w-[200px] truncate">{log.details}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <TabsContent value="violations" className="focus-visible:outline-none focus-visible:ring-0">
-        <CandidateViolations />
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="violations" className="focus-visible:outline-none focus-visible:ring-0">
+          <CandidateViolations />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
