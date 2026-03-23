@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Github } from "lucide-react";
 import { useAuthContext } from "@asgardeo/auth-react";
 import { motion } from "framer-motion";
-import introductionDoc from "../../../doc/introduction.md?raw";
-import gettingStartedDoc from "../../../doc/getting-started.md?raw";
-import identityLifecycleDoc from "../../../doc/identity-lifecycle.md?raw";
-import frontendDesignDoc from "../../../doc/frontend-design.md?raw";
+import introductionDoc from "../../../../doc/introduction.md?raw";
+import gettingStartedDoc from "../../../../doc/getting-started.md?raw";
+import identityLifecycleDoc from "../../../../doc/identity-lifecycle.md?raw";
+import frontendDesignDoc from "../../../../doc/frontend-design.md?raw";
 import MarkdownRenderer from "./MarkdownRenderer";
 import userGuideSvg from "@/assets/Online document-pana.svg";
 

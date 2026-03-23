@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Github } from "lucide-react";
 import { useAuthContext } from "@asgardeo/auth-react";
 import { motion } from "framer-motion";
-import apiEndpointsDoc from "../../../doc/api-endpoints.md?raw";
+import apiEndpointsDoc from "../../../../doc/api-endpoints.md?raw";
 import MarkdownRenderer from "./MarkdownRenderer";
 import apiDocsSvg from "@/assets/Fill out-pana.svg";
 
