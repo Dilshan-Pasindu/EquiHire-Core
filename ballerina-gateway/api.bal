@@ -10,14 +10,13 @@ import equihire/gateway.repositories;
 import equihire/gateway.services;
 import equihire/gateway.types;
 import equihire/gateway.utils;
-import equihire/gateway.config;
 
 @http:ServiceConfig {
     cors: {
-        allowOrigins: [config:frontendUrl],
+        allowOrigins: ["*"],
         allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allowHeaders: ["Content-Type", "Authorization"],
-        allowCredentials: true,
+        allowCredentials: false,
         maxAge: 3600
     }
 }
