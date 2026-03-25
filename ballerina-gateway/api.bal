@@ -20,7 +20,7 @@ import equihire/gateway.utils;
         maxAge: 3600
     }
 }
-service /api on apiListener {
+service / on apiListener {
 
 
     // --- CV Upload ---

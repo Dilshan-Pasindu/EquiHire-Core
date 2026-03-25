@@ -30,7 +30,7 @@ export type {
   Candidate,
 } from '@/types';
 
-const API_BASE_URL = ((window.configs?.VITE_API_URL || import.meta.env.VITE_API_URL) || 'http://localhost:9092') + '/api';
+const API_BASE_URL = (window.configs?.VITE_API_URL || import.meta.env.VITE_API_URL) || 'http://localhost:9092';
 
 /**
  * Fetches the organization for the given user id. Returns null if not found (404).
