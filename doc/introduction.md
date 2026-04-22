@@ -1,30 +1,64 @@
-# Introduction to EquiHire
+Introduction to EquiHire
+The Problem
 
-## The Problem
+The technical recruitment landscape in Sri Lanka faces several systemic challenges that hinder fair and effective talent evaluation. These challenges can be categorized into three key bottlenecks:
 
-The technical recruitment landscape in Sri Lanka is currently flawed due to three critical bottlenecks:
+1. The “Pedigree Effect” (Institutional Bias)
 
-1.  **The "Pedigree Effect" (Institutional Bias):** Recruiters subconsciously favor candidates from prestigious universities (e.g., Moratuwa/Colombo) while overlooking high-potential talent from regional universities (e.g., Rajarata/Ruhuna). This "University Bias" often leads to qualified candidates being rejected at the CV screening stage before their technical skills are ever tested.
-2.  **Inefficient Manual Screening:** HR managers are overwhelmed by the volume of applications. To cope, they often rely on crude keyword matching (Ctrl+F) or superficial metrics, which fails to capture a candidate’s true problem-solving ability.
-3.  **The "Black Box" of Rejection:** Rejected candidates rarely receive constructive feedback. They do not know if they failed because of a lack of technical knowledge or simply because they missed a specific keyword, stalling their professional growth.
+Recruitment decisions are often influenced by unconscious bias toward candidates from prestigious universities (e.g., University of Moratuwa, University of Colombo). As a result, highly capable candidates from regional institutions (e.g., Rajarata, Ruhuna) are frequently overlooked. This bias typically manifests at the CV screening stage, preventing skilled individuals from progressing to technical evaluation.
 
-## The Solution: Context-Aware Assessment Engine
+2. Inefficient Manual Screening
 
-EquiHire is an AI-Native Blind Assessment Platform designed to act as an objective "Bias Firewall." Instead of a standard interview, candidates complete a secure, lockdown technical assessment. The system acts as an intermediary agent that sanitizes the candidate's written identity and scores their technical answers semantically, ensuring hiring decisions are based strictly on code quality and logic, not background.
+HR professionals are required to process a high volume of applications, leading to reliance on inefficient filtering techniques such as keyword matching or superficial metrics. These approaches fail to accurately assess a candidate’s true technical ability and problem-solving skills.
 
-### Feature Name: The Context-Aware Assessment Engine (Powered by Ballerina & External AI)
+3. The “Black Box” of Rejection
 
-**Technology:** Ballerina Swan Lake, Google Gemini API, HuggingFace API.
+Candidates who are rejected rarely receive meaningful feedback. This lack of transparency prevents them from understanding whether the rejection was due to insufficient technical knowledge or simply missing specific keywords, ultimately limiting opportunities for professional growth.
 
-**Function:** The system utilizes robust integration orchestration to handle parsing and cognitive tasks natively using bounded records and retries:
+The Solution: Context-Aware Assessment Engine
 
-1.  **CV Parsing & Context Extraction:** Apache PDFBox extracts raw text which is sent to Google Gemini Flash. Gemini structuralizes the sections, maps PII, and determines candidate Experience Level and Tech Stack in a single JSON blob.
-2.  **Zero-Shot Relevance Gate:** During the exam, candidate answers are safely vaulted, pre-redacted using the PII map, and passed to a HuggingFace `bart-large-mnli` gate. Low relevance answers (< 0.45 confidence) are auto-scored zero to bypass expensive computation.
-3.  **Adaptive Scoring & Feedback:** Relevant answers are sent to Google Gemini along with the candidate's experience level against a model key to generate a final redacted answer, score, and a "Growth Report".
+EquiHire is an AI-native blind assessment platform designed to eliminate bias and improve the accuracy of technical hiring. It functions as an objective “Bias Firewall”, ensuring that hiring decisions are based solely on technical merit.
 
-## System Architecture
+Instead of relying on traditional CV screening, candidates complete a secure, controlled technical assessment. The platform anonymizes candidate identity and evaluates responses using semantic analysis, ensuring fairness and objectivity throughout the process.
 
-The following **High-Level Container Diagram** (based on the C4 Model) illustrates the EquiHire system architecture, highlighting the specific roles of the Microservices, SaaS components, and the unified AI Engine.
+Core Feature: Context-Aware Assessment Engine
+
+Technology Stack:
+Ballerina Swan Lake, Google Gemini API, HuggingFace API
+
+Functionality Overview
+
+The Context-Aware Assessment Engine leverages robust service orchestration and AI-driven evaluation to deliver accurate and unbiased candidate assessments:
+
+1. CV Parsing & Context Extraction
+Raw CV data is extracted using Apache PDFBox.
+The extracted text is processed by Google Gemini Flash.
+Gemini structures the data into a standardized JSON format, identifying:
+Personally Identifiable Information (PII)
+Candidate experience level
+Technical skill set
+2. Zero-Shot Relevance Gate
+Candidate responses are securely stored and pre-processed with PII redaction.
+Responses are evaluated using HuggingFace’s bart-large-mnli model.
+Answers with low relevance (confidence score < 0.45) are automatically scored zero.
+This step optimizes system efficiency by filtering out irrelevant submissions before deeper analysis.
+3. Adaptive Scoring & Feedback
+Relevant responses are evaluated by Google Gemini in the context of the candidate’s experience level.
+The system generates:
+A final redacted answer
+A technical score
+A personalized Growth Report with actionable feedback
+System Architecture
+
+The EquiHire platform is designed using a modular, scalable architecture aligned with the C4 Model (Container Diagram) approach.
+
+The system consists of:
+
+Microservices responsible for processing, orchestration, and evaluation
+SaaS integrations for AI-powered analysis and document processing
+A unified AI Engine that coordinates context extraction, validation, scoring, and feedback generation
+
+This architecture ensures high reliability, scalability, and seamless integration between components while maintaining strict data privacy and bias control.
 
 ```mermaid
 graph TB
