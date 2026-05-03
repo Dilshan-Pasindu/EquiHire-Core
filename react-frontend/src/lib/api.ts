@@ -30,7 +30,11 @@ export type {
   Candidate,
 } from '@/types';
 
-const API_BASE_URL = ((window.configs?.VITE_API_URL || import.meta.env.VITE_API_URL) || 'http://localhost:9092') + '/api';
+// VITE_API_URL must be the full base path including any sub-path.
+// Locally:  http://localhost:9092/api  (Ballerina serves under /api)
+// Choreo:   https://<choreo-host>/equihire/gateway/endpoint-9092-1da/v1.0
+//           (Choreo gateway already strips the /api context — do NOT append it here)
+const API_BASE_URL = (window.configs?.VITE_API_URL || import.meta.env.VITE_API_URL) || 'http://localhost:9092/api';
 
 /**
  * Fetches the organization for the given user id. Returns null if not found (404).
